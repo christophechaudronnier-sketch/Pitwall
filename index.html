@@ -1739,6 +1739,9 @@ function applyRaceStateFromServer(state) {
   if(!G || !state) return;
   MULTI.raceState = state;
 
+  // Chrono — serveur est la vérité
+  if(state.raceTimeMs !== undefined) G.raceTimeMs = state.raceTimeMs;
+
   // Météo
   if(state.weather !== undefined) {
     const prev = G.weather;
@@ -3793,7 +3796,8 @@ function gameLoop(ts) {
   lastTs = ts;
 
   if(!G.paused) {
-    G.raceTimeMs += dt * 9;
+    // Chrono — local en solo, serveur en multi
+    if(!MULTI.eventId) G.raceTimeMs += dt * 9;
 
     if(!MULTI.eventId) {
       // ══ MODE SOLO : tout se calcule localement ══
