@@ -1729,10 +1729,17 @@ function startMultiSync() {
   console.log('[Multi] Écoute race_state activée');
 }
 
+// ── Interpolation entre deux états serveur ──
+MULTI.prevStandings = null;
+MULTI.nextStandings = null;
+MULTI.interpStart = 0;
+MULTI.interpDuration = 200; // ms — correspond au DT serveur
+
 function applyRaceStateFromServer(state) {
   if(!G || !state) return;
   MULTI.raceState = state;
 
+  // Météo
   if(state.weather !== undefined) {
     const prev = G.weather;
     G.weather = state.weather;
@@ -1747,6 +1754,7 @@ function applyRaceStateFromServer(state) {
     }
   }
 
+  // Safety Car
   if(state.safetyCar !== undefined) {
     const prev = G.safetyCar;
     G.safetyCar = state.safetyCar;
@@ -1761,42 +1769,82 @@ function applyRaceStateFromServer(state) {
     }
   }
 
-  if(state.standings && G.competitors) {
-    state.standings.forEach(entry => {
-      let comp = null;
-      if(entry.isAI) {
-        comp = G.competitors.find(c => c.teamName === entry.teamName);
-      } else {
-        comp = G.competitors.find(c => c.playerId === entry.playerId);
-      }
-      if(!comp) return;
-      comp.trackPos = entry.trackPos;
-      comp.distTotal = entry.distTotal;
-      comp.lap = entry.lap;
-      comp.tyreType = entry.tyreType;
-      comp.battery = entry.battery;
-      comp.pitState = entry.pitState || 'racing';
-      comp.pitLanePos = entry.pitLanePos || 0;
-      comp.retired = entry.retired || false;
-    });
+  // Stocker pour interpolation
+  if(state.standings) {
+    MULTI.prevStandings = MULTI.nextStandings;
+    MULTI.nextStandings = state.standings;
+    MULTI.interpStart = performance.now();
 
-    // Position du joueur — le serveur est la vérité
-    const myEntry = state.standings.find(e => e.playerId === MULTI.playerId);
-    if(myEntry) {
-      G.trackPos = myEntry.trackPos;
-      G.distTotal = myEntry.distTotal;
-      G.lap = myEntry.lap;
-      G.tyreType = myEntry.tyreType;
-      G.battery = myEntry.battery;
-      G.pitState = myEntry.pitState || 'racing';
-      G.pitLanePos = myEntry.pitLanePos || 0;
-    }
+    // Appliquer immédiatement les données non-visuelles
+    state.standings.forEach(entry => {
+      // Mettre à jour lap, tyreType, battery, retired (pas trackPos — interpolé)
+      let comp = entry.isAI
+        ? G.competitors.find(c => c.teamName === entry.teamName)
+        : G.competitors.find(c => c.playerId === entry.playerId);
+      if(comp) {
+        comp.lap = entry.lap;
+        comp.tyreType = entry.tyreType;
+        comp.battery = entry.battery;
+        comp.retired = entry.retired || false;
+        comp.distTotal = entry.distTotal;
+        comp.pitState = entry.pitState || 'racing';
+        comp.pitLanePos = entry.pitLanePos || 0;
+      }
+
+      // Ma voiture
+      if(entry.playerId === MULTI.playerId) {
+        G.lap = entry.lap;
+        G.tyreType = entry.tyreType;
+        G.battery = entry.battery;
+        G.distTotal = entry.distTotal;
+        G.pitState = entry.pitState || 'racing';
+        G.pitLanePos = entry.pitLanePos || 0;
+      }
+    });
   }
 
   if(state.finished && !G.finished) {
     G.finished = true;
     endRace();
   }
+}
+
+// ── Appliquer l'interpolation dans la game loop ──
+function applyInterpolation() {
+  if(!MULTI.nextStandings || !MULTI.prevStandings) {
+    // Pas encore deux états — appliquer directement
+    if(MULTI.nextStandings) {
+      MULTI.nextStandings.forEach(entry => {
+        applyEntryPosition(entry, 1.0);
+      });
+    }
+    return;
+  }
+
+  const elapsed = performance.now() - MULTI.interpStart;
+  const t = Math.min(elapsed / MULTI.interpDuration, 1.0);
+
+  MULTI.nextStandings.forEach((next, i) => {
+    const prev = MULTI.prevStandings[i];
+    if(!prev) { applyEntryPosition(next, 1.0); return; }
+    // Interpoler trackPos entre prev et next
+    const interpPos = prev.trackPos + (next.trackPos - prev.trackPos) * t;
+    applyEntryPosition(next, 1.0, interpPos);
+  });
+}
+
+function applyEntryPosition(entry, t, interpPos) {
+  const pos = interpPos !== undefined ? interpPos : entry.trackPos;
+
+  if(entry.playerId === MULTI.playerId) {
+    G.trackPos = pos;
+    return;
+  }
+
+  let comp = entry.isAI
+    ? G.competitors.find(c => c.teamName === entry.teamName)
+    : G.competitors.find(c => c.playerId === entry.playerId);
+  if(comp) comp.trackPos = pos;
 }
 
 let _lastDecisionPublish = 0;
@@ -3756,7 +3804,8 @@ function gameLoop(ts) {
     } else {
       // ══ MODE MULTI : Cloud Function gère tout ══
       // Le client publie ses décisions, le serveur est la vérité
-      tickBoost(dt); // uniquement pour l'animation boost
+      tickBoost(dt);
+      applyInterpolation(); // lisser visuellement entre deux états serveur
       publishPlayerDecisions();
     }
 
