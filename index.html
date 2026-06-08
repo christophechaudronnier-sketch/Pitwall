@@ -1794,15 +1794,18 @@ function applyRaceStateFromServer(state) {
         comp.pitLanePos = entry.pitLanePos || 0;
       }
 
-      // Ma voiture
-      if(entry.playerId === MULTI.playerId) {
-        G.lap = entry.lap;
-        G.tyreType = entry.tyreType;
-        G.battery = entry.battery;
-        G.distTotal = entry.distTotal;
-        G.pitState = entry.pitState || 'racing';
-        G.pitLanePos = entry.pitLanePos || 0;
-      }
+    // Ma voiture
+    if(entry.playerId === MULTI.playerId) {
+      G.lap = entry.lap;
+      G.tyreType = entry.tyreType;
+      G.tyreWear = entry.tyreWear ?? G.tyreWear;
+      G.fuel = entry.fuel ?? G.fuel;
+      G.battery = entry.battery;
+      G.engineHealth = entry.engineHealth ?? G.engineHealth;
+      G.distTotal = entry.distTotal;
+      G.pitState = entry.pitState || 'racing';
+      G.pitLanePos = entry.pitLanePos || 0;
+    }
     });
   }
 
