@@ -1,0 +1,4677 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pit Wall — Racing Manager</title>
+
+<!-- Firebase CDN -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCAcm_woYq9NeP-WZYqzKeO7XD0SZs3xhc",
+  authDomain: "pitwall-web-bd1e0.firebaseapp.com",
+  databaseURL: "https://pitwall-web-bd1e0-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "pitwall-web-bd1e0",
+  storageBucket: "pitwall-web-bd1e0.firebasestorage.app",
+  messagingSenderId: "720299322185",
+  appId: "1:720299322185:web:56981fd7446040b3dc4898"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+console.log('[Firebase] Connecté ✅');
+</script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500;600;700&family=Barlow:wght@300;400;500&family=Share+Tech+Mono&display=swap');
+
+  :root {
+    --bg: #0a0c0f;
+    --bg2: #10141a;
+    --bg3: #161c24;
+    --bg4: #1e2530;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.15);
+    --accent: #e8a020;
+    --accent2: #c4831a;
+    --red: #e83c3c;
+    --green: #3ce87a;
+    --blue: #3ca8e8;
+    --cyan: #3ce8d4;
+    --text: #e8e4dc;
+    --text2: #8a8880;
+    --text3: #5a5856;
+    --soft: rgba(232,160,32,0.1);
+    --soft2: rgba(232,160,32,0.05);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ─── HEADER ─── */
+  #header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .logo span { color: var(--text2); font-weight: 300; }
+  #race-clock {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 22px;
+    color: var(--accent);
+    letter-spacing: 2px;
+  }
+  #race-clock.night { color: #8ab4e8; }
+  #header-right { display:flex; gap:16px; align-items:center; }
+  .hstat { text-align:right; }
+  .hstat-label { font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:1px; }
+  .hstat-val { font-family:'Share Tech Mono',monospace; font-size:14px; color:var(--text); }
+
+  /* ─── LAYOUT ─── */
+  #app {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    grid-template-rows: auto auto;
+    gap: 12px;
+    padding: 12px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  /* ─── PANELS ─── */
+  .panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 8px 14px;
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .panel-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text2);
+  }
+  .panel-title span { color: var(--accent); }
+  .panel-body { padding: 12px; }
+
+  /* ─── CIRCUIT CANVAS ─── */
+  #circuit-wrap {
+    grid-column: 1;
+    grid-row: 1;
+    position: relative;
+    height: 500px;
+  }
+  #circuit-canvas { width:100%; height:100%; display:block; }
+  #sky-overlay {
+    position:absolute; inset:0; pointer-events:none;
+    transition: background 4s;
+  }
+  #track-info-overlay {
+    position:absolute; bottom:10px; left:14px;
+    display:flex; gap:16px;
+  }
+  .track-badge {
+    background: rgba(10,12,15,0.85);
+    border: 1px solid var(--border2);
+    border-radius:3px;
+    padding:4px 10px;
+    font-family:'Share Tech Mono',monospace;
+    font-size:11px;
+  }
+  .track-badge span { color:var(--accent); }
+
+  /* ─── STRATÉGIE (droite) ─── */
+  #strat-panel {
+    grid-column: 2;
+    grid-row: 1 / 3;
+  }
+
+  /* ─── CLASSEMENT + DONNÉES (bas gauche) ─── */
+  #bottom-left {
+    grid-column: 1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+  }
+
+  /* ─── CLASSEMENT ─── */
+  .standing-row {
+    display: grid;
+    grid-template-columns: 20px 1fr 60px 50px 55px;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+    transition: background 0.2s;
+  }
+  .standing-row:hover { background: var(--bg4); }
+  .standing-row.player { background: var(--soft2); border-left: 2px solid var(--accent); padding-left:4px; }
+  .pos-num {
+    font-family:'Share Tech Mono',monospace;
+    font-size:13px;
+    color: var(--text2);
+    text-align:center;
+  }
+  .pos-num.p1 { color:var(--accent); font-weight:700; }
+  .car-name { font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .car-sub { font-size:10px; color:var(--text3); }
+  .gap-val { font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--text2); text-align:right; }
+  .gap-val.leader { color:var(--green); }
+  .lap-val { font-family:'Share Tech Mono',monospace; font-size:11px; text-align:right; }
+  .tyre-dot {
+    width:10px; height:10px; border-radius:50%;
+    display:inline-block; margin-right:2px;
+  }
+  .tyre-S { background:#e8e020; }
+  .tyre-M { background:#e8a020; }
+  .tyre-H { background:#e8e8e8; }
+  .tyre-W { background:#3ca8e8; }
+  .tyre-I { background:#3ce8d4; }
+  .tyre-badge {
+    display:inline-flex; align-items:center; gap:3px;
+    font-family:'Share Tech Mono',monospace; font-size:10px;
+    padding:1px 5px;
+    border-radius:2px;
+    background:var(--bg4);
+  }
+
+  /* ─── TELEMETRIE ─── */
+  .telem-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .telem-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius:3px;
+    padding:8px 10px;
+  }
+  .telem-label {
+    font-size:10px; color:var(--text3);
+    text-transform:uppercase; letter-spacing:1px;
+    margin-bottom:4px;
+  }
+  .telem-val {
+    font-family:'Share Tech Mono',monospace;
+    font-size:18px; font-weight:500;
+  }
+  .telem-val.warn { color:var(--red); }
+  .telem-val.ok { color:var(--green); }
+  .telem-val.mid { color:var(--accent); }
+  .telem-bar {
+    height:4px; background:var(--bg4);
+    border-radius:2px; margin-top:4px; overflow:hidden;
+  }
+  .telem-bar-fill {
+    height:100%; border-radius:2px;
+    transition: width 0.5s, background 0.5s;
+  }
+
+  /* ─── BOUTONS STRATÉGIE ─── */
+  .strat-section { margin-bottom:14px; }
+  .strat-section-title {
+    font-size:10px; color:var(--text3);
+    text-transform:uppercase; letter-spacing:1.5px;
+    margin-bottom:6px;
+  }
+  .btn-group { display:flex; gap:6px; flex-wrap:wrap; }
+  .btn {
+    font-family:'Barlow Condensed',sans-serif;
+    font-size:12px; font-weight:600;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    padding:6px 12px;
+    border:1px solid var(--border2);
+    border-radius:3px;
+    background: var(--bg3);
+    color: var(--text);
+    cursor:pointer;
+    transition: all 0.15s;
+  }
+  .btn:hover { border-color:var(--accent); color:var(--accent); background:var(--soft2); }
+  .btn:active { transform:scale(0.97); }
+  .btn.selected { border-color:var(--accent); color:var(--accent); background:var(--soft); }
+  .btn.danger { border-color:var(--red); }
+  .btn.danger:hover { color:var(--red); background:rgba(232,60,60,0.1); }
+  .btn.action {
+    background:var(--accent); color:var(--bg); border-color:var(--accent);
+    font-weight:700;
+  }
+  .btn.action:hover { background:var(--accent2); border-color:var(--accent2); }
+  .btn:disabled { opacity:0.3; cursor:default; pointer-events:none; }
+
+  /* ─── MESSAGES RADIO ─── */
+  #radio-log {
+    max-height:120px; overflow-y:auto;
+    display:flex; flex-direction:column; gap:4px;
+  }
+  .radio-msg {
+    font-size:11px; padding:4px 8px;
+    background:var(--bg3); border-left:2px solid var(--border2);
+    border-radius:0 3px 3px 0;
+    animation: fadeIn 0.3s ease;
+  }
+  .radio-msg.alert { border-left-color:var(--red); }
+  .radio-msg.good { border-left-color:var(--green); }
+  .radio-msg.info { border-left-color:var(--accent); }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
+  .radio-time { color:var(--text3); margin-right:6px; font-family:'Share Tech Mono',monospace; }
+
+  /* ─── MÉTÉO ─── */
+  .weather-bar {
+    display:flex; gap:6px; align-items:center;
+    padding:6px 0;
+  }
+  .weather-icon { font-size:20px; }
+  .weather-detail { font-size:11px; color:var(--text2); }
+
+  /* ─── PILOTES ─── */
+  .driver-row {
+    display:flex; align-items:center; gap:10px;
+    padding:6px 0; border-bottom:1px solid var(--border);
+  }
+  .driver-row:last-child { border:none; }
+  .driver-num {
+    width:26px; height:26px;
+    border-radius:3px;
+    background:var(--accent);
+    color:var(--bg);
+    font-family:'Barlow Condensed',sans-serif;
+    font-weight:700; font-size:13px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .driver-info { flex:1; }
+  .driver-name { font-weight:500; font-size:13px; }
+  .driver-stat { font-size:10px; color:var(--text3); }
+  .driver-bars { width:80px; }
+  .mini-bar { height:3px; background:var(--bg4); border-radius:1px; margin-bottom:2px; overflow:hidden; }
+  .mini-bar-fill { height:100%; border-radius:1px; background:var(--accent); }
+  .stamina-fill { background:var(--green); }
+
+  /* ─── MODAL PIT STOP ─── */
+  #pit-modal {
+    display:none; position:fixed; inset:0;
+    background:rgba(0,0,0,0.85);
+    z-index:200;
+    align-items:center; justify-content:center;
+  }
+  #pit-modal.open { display:flex; }
+  .modal-box {
+    background:var(--bg2);
+    border:1px solid var(--border2);
+    border-top:2px solid var(--accent);
+    border-radius:4px;
+    padding:20px 24px;
+    width:420px;
+    max-width:95vw;
+  }
+  .modal-title {
+    font-family:'Barlow Condensed',sans-serif;
+    font-size:18px; font-weight:700;
+    letter-spacing:2px; text-transform:uppercase;
+    color:var(--accent);
+    margin-bottom:16px;
+  }
+  .modal-row {
+    display:grid; grid-template-columns:100px 1fr;
+    align-items:center; gap:10px;
+    margin-bottom:10px;
+  }
+  .modal-label { font-size:11px; color:var(--text2); text-transform:uppercase; letter-spacing:1px; }
+  .modal-actions { display:flex; gap:10px; margin-top:20px; justify-content:flex-end; }
+
+  /* ─── SCREEN SETUP ─── */
+  #setup-screen {
+    display:flex; align-items:center; justify-content:center;
+    min-height:100vh;
+    background: radial-gradient(ellipse at 50% 60%, #1a1200 0%, #0a0c0f 70%);
+  }
+  .setup-box {
+    background:var(--bg2);
+    border:1px solid var(--border2);
+    border-top:3px solid var(--accent);
+    border-radius:4px;
+    padding:32px 36px;
+    width:560px;
+    max-width:95vw;
+  }
+  .setup-title {
+    font-family:'Barlow Condensed',sans-serif;
+    font-size:32px; font-weight:700;
+    letter-spacing:4px; text-transform:uppercase;
+    color:var(--accent); margin-bottom:4px;
+  }
+  .setup-sub { font-size:13px; color:var(--text3); margin-bottom:24px; letter-spacing:1px; }
+  .setup-section { margin-bottom:20px; }
+  .setup-section-title {
+    font-size:10px; color:var(--text3);
+    text-transform:uppercase; letter-spacing:2px;
+    margin-bottom:8px; padding-bottom:4px;
+    border-bottom:1px solid var(--border);
+  }
+  .car-cards { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+  .car-card {
+    background:var(--bg3); border:1px solid var(--border);
+    border-radius:3px; padding:10px;
+    cursor:pointer; transition:all 0.15s;
+  }
+  .car-card:hover { border-color:var(--accent); }
+  .car-card.selected { border-color:var(--accent); background:var(--soft); }
+  .car-card-name { font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:600; letter-spacing:1px; }
+  .car-card-class { font-size:10px; color:var(--text3); margin-bottom:6px; }
+  .car-stat-row { display:flex; justify-content:space-between; font-size:10px; color:var(--text2); margin-bottom:2px; }
+  .car-stat-bar { height:3px; background:var(--bg4); border-radius:1px; margin-bottom:4px; overflow:hidden; }
+  .car-stat-fill { height:100%; border-radius:1px; background:var(--accent); }
+  .driver-select-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .driver-card {
+    background:var(--bg3); border:1px solid var(--border);
+    border-radius:3px; padding:8px 10px;
+    cursor:pointer; transition:all 0.15s;
+  }
+  .driver-card:hover { border-color:var(--accent); }
+  .driver-card.selected { border-color:var(--accent); background:var(--soft); }
+  .driver-card-name { font-size:13px; font-weight:500; }
+  .driver-card-nat { font-size:10px; color:var(--text3); }
+  .driver-card-skills { display:flex; gap:4px; margin-top:4px; flex-wrap:wrap; }
+  .skill-tag {
+    font-size:9px; padding:1px 5px;
+    background:var(--bg4); border:1px solid var(--border);
+    border-radius:2px; color:var(--text2);
+  }
+  .skill-tag.night { color:#8ab4e8; border-color:#8ab4e833; }
+  .skill-tag.rain { color:var(--blue); border-color:#3ca8e833; }
+  .skill-tag.tire { color:var(--green); border-color:#3ce87a33; }
+  input[type=text] {
+    background:var(--bg3); border:1px solid var(--border2);
+    color:var(--text); font-family:'Barlow',sans-serif; font-size:14px;
+    padding:8px 12px; border-radius:3px; width:200px;
+  }
+  input[type=text]:focus { outline:none; border-color:var(--accent); }
+
+  /* ─── NOTIFICATIONS ─── */
+  #notif-area {
+    position:fixed; top:60px; right:12px;
+    z-index:300; display:flex; flex-direction:column; gap:6px;
+    pointer-events:none;
+  }
+  .notif {
+    background:var(--bg2); border:1px solid var(--border2);
+    border-left:3px solid var(--accent);
+    border-radius:3px; padding:8px 14px;
+    font-size:12px; min-width:240px;
+    animation: slideIn 0.3s ease, fadeOut 0.4s 3.6s forwards;
+    pointer-events:all;
+  }
+  .notif.alert { border-left-color:var(--red); }
+  .notif.good { border-left-color:var(--green); }
+  @keyframes slideIn { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:none} }
+  @keyframes fadeOut { from{opacity:1} to{opacity:0} }
+
+  /* ─── QUALIF SCREEN ─── */
+  #qualif-screen {
+    display:none; flex-direction:column;
+    min-height:100vh; background:var(--bg);
+  }
+  #qualif-header {
+    background:var(--bg2); border-bottom:1px solid var(--border);
+    padding:0 24px; height:52px;
+    display:flex; align-items:center; justify-content:space-between;
+    position:sticky; top:0; z-index:100;
+  }
+  #qualif-clock-display {
+    font-family:'Share Tech Mono',monospace;
+    font-size:26px; color:var(--accent); letter-spacing:2px;
+  }
+  #qualif-clock-display.urgent { color:var(--red); animation: pulse 0.5s infinite alternate; }
+  @keyframes pulse { from{opacity:1} to{opacity:0.5} }
+  #qualif-body {
+    display:grid; grid-template-columns:1fr 320px;
+    gap:12px; padding:12px;
+    max-width:1400px; margin:0 auto; width:100%;
+  }
+  #qualif-circuit-wrap {
+    position:relative; height:500px;
+  }
+  #qualif-canvas { width:100%; height:100%; display:block; }
+  #qualif-track-overlay {
+    position:absolute; bottom:10px; left:14px;
+    display:flex; gap:10px;
+  }
+  #qualif-right { display:flex; flex-direction:column; gap:0; }
+
+  /* Ligne de grille */
+  .grid-row {
+    display:grid; grid-template-columns:36px 1fr 90px 70px;
+    align-items:center; gap:10px;
+    padding:8px 14px; border-radius:3px;
+    margin-bottom:4px;
+    background:var(--bg2); border:1px solid var(--border);
+    font-size:13px;
+    opacity:0; transform:translateX(-30px);
+    transition: opacity 0.4s, transform 0.4s;
+  }
+  .grid-row.visible { opacity:1; transform:none; }
+  .grid-row.player-row { border-color:var(--accent); background:var(--soft2); }
+  .grid-pos {
+    font-family:'Barlow Condensed',sans-serif; font-size:22px;
+    font-weight:700; color:var(--text3); text-align:center;
+  }
+  .grid-pos.p1 { color:gold; }
+  .grid-pos.p2 { color:silver; }
+  .grid-pos.p3 { color:#cd7f32; }
+  .grid-car { font-weight:500; }
+  .grid-car-sub { font-size:10px; color:var(--text3); }
+  .grid-time {
+    font-family:'Share Tech Mono',monospace; font-size:12px;
+    text-align:right; color:var(--text2);
+  }
+  .grid-gap {
+    font-family:'Share Tech Mono',monospace; font-size:11px;
+    text-align:right; color:var(--text3);
+  }
+
+  /* ─── QUALIF STANDINGS ─── */
+  .q-row {
+    display:grid; grid-template-columns:20px 1fr 70px;
+    gap:6px; align-items:center;
+    padding:4px 4px; font-size:11px;
+    border-radius:2px;
+  }
+  .q-row.player { background:var(--soft2); border-left:2px solid var(--accent); padding-left:2px; }
+  .q-pos { font-family:'Share Tech Mono',monospace; color:var(--text3); text-align:center; }
+  .q-pos.best { color:var(--accent); font-weight:700; }
+  .q-time { font-family:'Share Tech Mono',monospace; text-align:right; }
+
+  /* ─── SECTEURS ─── */
+  .sector-dots {
+    display:flex; gap:6px; margin-top:10px;
+  }
+  .sector-dot {
+    flex:1; height:4px; border-radius:2px;
+    background:var(--bg4);
+    transition:background 0.3s;
+  }
+  .sector-dot.done { background:var(--green); }
+  .sector-dot.active { background:var(--accent); }
+  ::-webkit-scrollbar { width:4px; height:4px; }
+  ::-webkit-scrollbar-track { background:var(--bg); }
+  ::-webkit-scrollbar-thumb { background:var(--bg4); border-radius:2px; }
+
+  /* ─── END SCREEN ─── */
+  #end-screen {
+    display:none; position:fixed; inset:0;
+    background:rgba(0,0,0,0.92); z-index:400;
+    align-items:center; justify-content:center;
+  }
+  #end-screen.open { display:flex; }
+  .end-box {
+    background:var(--bg2);
+    border:1px solid var(--border2);
+    border-top:3px solid var(--accent);
+    border-radius:4px;
+    padding:32px 40px;
+    width:500px; max-width:95vw;
+    text-align:center;
+  }
+  .end-title {
+    font-family:'Barlow Condensed',sans-serif;
+    font-size:36px; font-weight:700;
+    letter-spacing:4px; text-transform:uppercase;
+    color:var(--accent); margin-bottom:8px;
+  }
+  .end-pos {
+    font-family:'Share Tech Mono',monospace;
+    font-size:64px; color:var(--accent);
+    line-height:1; margin:16px 0;
+  }
+  .end-stats { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin:20px 0; }
+  .end-stat { background:var(--bg3); border-radius:3px; padding:10px; }
+  .end-stat-label { font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:1px; }
+  .end-stat-val { font-family:'Share Tech Mono',monospace; font-size:18px; color:var(--text); }
+  /* ─── MODE SELECT ─── */
+  #mode-select-screen {
+    min-height:100vh;
+    background: #0a0c0f;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .mode-select-box {
+    text-align:center;
+    max-width:860px; width:96vw;
+  }
+  .mode-logo {
+    font-family:'Barlow Condensed',sans-serif;
+    font-size:14px; font-weight:600;
+    letter-spacing:6px; text-transform:uppercase;
+    color:var(--text3); margin-bottom:12px;
+  }
+  .mode-title {
+    font-family:'Barlow Condensed',sans-serif;
+    font-size:52px; font-weight:700;
+    letter-spacing:6px; color:var(--text);
+    margin-bottom:40px; line-height:1;
+  }
+  .mode-cards {
+    display:grid; grid-template-columns:1fr 1fr;
+    gap:20px; margin-bottom:32px;
+  }
+  .mode-card {
+    background:var(--bg2);
+    border:2px solid var(--border);
+    border-radius:6px;
+    padding:32px 28px;
+    cursor:pointer;
+    transition:all 0.2s;
+    text-align:left;
+    position:relative;
+    overflow:hidden;
+  }
+  .mode-card::before {
+    content:'';
+    position:absolute; inset:0;
+    opacity:0; transition:opacity 0.2s;
+  }
+  .mode-card.gt::before { background:radial-gradient(ellipse at 30% 50%, rgba(232,160,32,0.08), transparent 70%); }
+  .mode-card.sc::before { background:radial-gradient(ellipse at 30% 50%, rgba(232,60,60,0.08), transparent 70%); }
+  .mode-card:hover { transform:translateY(-3px); }
+  .mode-card.gt:hover { border-color:var(--accent); }
+  .mode-card.sc:hover { border-color:#e84040; }
+  .mode-card-icon { font-size:48px; margin-bottom:16px; line-height:1; }
+  .mode-card-title {
+    font-family:'Barlow Condensed',sans-serif;
+    font-size:28px; font-weight:700;
+    letter-spacing:3px; text-transform:uppercase;
+    margin-bottom:4px;
+  }
+  .mode-card.gt .mode-card-title { color:var(--accent); }
+  .mode-card.sc .mode-card-title { color:#e84040; }
+  .mode-card-sub {
+    font-size:11px; color:var(--text3);
+    letter-spacing:1px; text-transform:uppercase;
+    margin-bottom:16px;
+  }
+  .mode-card-desc { font-size:13px; color:var(--text2); line-height:1.6; }
+  .mode-card-tags {
+    display:flex; flex-wrap:wrap; gap:6px;
+    margin-top:16px;
+  }
+  .mode-tag {
+    font-size:10px; padding:3px 8px;
+    border-radius:2px; letter-spacing:0.5px;
+    border:1px solid;
+  }
+  .mode-card.gt .mode-tag { color:var(--accent); border-color:rgba(232,160,32,0.3); background:rgba(232,160,32,0.06); }
+  .mode-card.sc .mode-tag { color:#e84040; border-color:rgba(232,64,64,0.3); background:rgba(232,64,64,0.06); }
+  .mode-footer { font-size:11px; color:var(--text3); }
+</style>
+</head>
+<body>
+
+<!-- MODE SELECT -->
+<div id="mode-select-screen">
+  <div class="mode-select-box">
+    <div class="mode-logo">Pit Wall</div>
+    <div class="mode-title">CHOISISSEZ VOTRE MONDE</div>
+    <div class="mode-cards">
+
+      <div class="mode-card gt" onclick="selectMode('gt')">
+        <div class="mode-card-icon">🏆</div>
+        <div class="mode-card-title">Pit Wall GT</div>
+        <div class="mode-card-sub">GT3 Pro Series · Circuit routier</div>
+        <div class="mode-card-desc">
+          Gérez votre écurie GT3 sur des circuits techniques. Maîtrisez la stratégie pneumatiques, la gestion moteur et les fenêtres d'arrêts aux stands pour battre l'élite du GT mondial.
+        </div>
+        <div class="mode-card-tags">
+          <span class="mode-tag">Circuit routier</span>
+          <span class="mode-tag">Stratégie pneus</span>
+          <span class="mode-tag">2 arrêts</span>
+          <span class="mode-tag">GT3 / GTE</span>
+        </div>
+      </div>
+
+      <div class="mode-card sc" onclick="selectMode('sc')">
+        <div class="mode-card-icon">🏁</div>
+        <div class="mode-card-title">Stock Car</div>
+        <div class="mode-card-sub">Oval Series · Circuit ovale</div>
+        <div class="mode-card-desc">
+          Plongez dans l'univers du racing américain sur circuit ovale. Gérez le drafting, les cautions, et les pit stops éclair pour vous hisser en tête du peloton.
+        </div>
+        <div class="mode-card-tags">
+          <span class="mode-tag">Circuit ovale</span>
+          <span class="mode-tag">Drafting</span>
+          <span class="mode-tag">Caution periods</span>
+          <span class="mode-tag">NASCAR Style</span>
+        </div>
+      </div>
+
+    </div>
+    <div class="mode-footer">Deux univers, une seule passion — la course automobile</div>
+    <div style="margin-top:16px">
+      <button class="btn action" style="width:100%;font-size:15px;padding:14px;letter-spacing:2px;border-radius:4px" onclick="goToLobby()">
+        ⚡ MULTIJOUEUR — JOINDRE / CRÉER UNE COURSE
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen" style="display:none">
+  <div class="setup-box">
+    <div class="setup-title">GT Racing</div>
+    <div class="setup-sub">Racing Manager · GT Pro Series</div>
+
+    <div class="setup-section">
+      <div class="setup-section-title">Nom de l'écurie</div>
+      <input type="text" id="team-name-input" value="Écurie Blanc" maxlength="20">
+    </div>
+
+    <div class="setup-section">
+      <div class="setup-section-title">Choisir la voiture</div>
+      <div class="car-cards" id="car-selector"></div>
+    </div>
+
+    <div class="setup-section">
+      <div class="setup-section-title">Choisir votre pilote</div>
+      <div class="driver-select-grid" id="driver-selector"></div>
+    </div>
+
+    <div style="margin-top:24px; text-align:right">
+      <button class="btn action" style="font-size:14px;padding:10px 28px;" onclick="goToParcFerme()">SUIVANT ►</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOBBY MULTIJOUEUR -->
+<div id="lobby-screen" style="display:none;align-items:center;justify-content:center;min-height:100vh;background:radial-gradient(ellipse at 50% 40%,#000a1a 0%,#0a0c0f 70%)">
+  <div style="width:560px;max-width:96vw">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:600;letter-spacing:6px;color:var(--text3);margin-bottom:8px">PIT WALL</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:700;letter-spacing:4px;color:var(--accent)">MULTIJOUEUR</div>
+    </div>
+
+    <div class="panel" style="margin-bottom:12px">
+      <div class="panel-header"><span class="panel-title">Votre <span>écurie</span></span></div>
+      <div class="panel-body">
+        <input type="text" id="lobby-team-name" placeholder="Nom de votre écurie..." maxlength="20" value="Écurie Blanc"
+          style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:3px;font-family:'Barlow Condensed',sans-serif;font-size:14px;box-sizing:border-box">
+      </div>
+    </div>
+
+    <!-- Créer un événement -->
+    <div class="panel" style="margin-bottom:12px">
+      <div class="panel-header"><span class="panel-title">Créer <span>un événement</span></span></div>
+      <div class="panel-body">
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <input type="text" id="event-name-input" placeholder="Nom de la course..." maxlength="30"
+            style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:3px;font-family:'Barlow Condensed',sans-serif;font-size:14px">
+          <select id="event-mode-select" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:3px;font-family:'Barlow Condensed',sans-serif">
+            <option value="gt">GT Manager</option>
+            <option value="sc">Stock Car</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <select id="event-laps-select" style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:3px;font-family:'Barlow Condensed',sans-serif">
+            <option value="20">Sprint — 20 tours</option>
+            <option value="35">Court — 35 tours</option>
+            <option value="55" selected>Standard — 55 tours ★</option>
+            <option value="80">Long — 80 tours</option>
+          </select>
+          <select id="event-max-players" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:3px;font-family:'Barlow Condensed',sans-serif">
+            <option value="4">4 joueurs</option>
+            <option value="8">8 joueurs</option>
+            <option value="12" selected>12 joueurs</option>
+            <option value="20">20 joueurs</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:3px">
+          <label style="font-size:12px;color:var(--text2);flex:1">🤖 Voitures IA pour compléter la grille</label>
+          <select id="event-ai-count" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:3px;font-family:'Barlow Condensed',sans-serif;font-size:12px">
+            <option value="0">Aucune IA</option>
+            <option value="4">4 IA</option>
+            <option value="8">8 IA</option>
+            <option value="12" selected>12 IA</option>
+            <option value="20">20 IA</option>
+          </select>
+        </div>
+        <button class="btn action" style="width:100%" onclick="pwCreateEvent()">🏁 CRÉER L'ÉVÉNEMENT</button>
+      </div>
+    </div>
+
+    <!-- Rejoindre un événement -->
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-header"><span class="panel-title">Rejoindre <span>un événement</span></span></div>
+      <div class="panel-body">
+        <div style="display:flex;gap:8px">
+          <input type="text" id="event-code-input" placeholder="Code de l'événement..." maxlength="6"
+            style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:3px;font-family:'Share Tech Mono',monospace;font-size:16px;text-transform:uppercase;letter-spacing:4px"
+            oninput="this.value=this.value.toUpperCase()">
+          <button class="btn action" onclick="pwJoinEvent()">REJOINDRE ►</button>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:var(--text3)" id="join-status"></div>
+      </div>
+    </div>
+
+    <div style="text-align:center">
+      <button class="btn" onclick="backToModeSelect()">◄ Retour</button>
+    </div>
+  </div>
+</div>
+
+<!-- SALLE D'ATTENTE -->
+<div id="waiting-room-screen" style="display:none;align-items:center;justify-content:center;min-height:100vh;background:radial-gradient(ellipse at 50% 40%,#000a1a 0%,#0a0c0f 70%)">
+  <div style="width:580px;max-width:96vw">
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;letter-spacing:4px;color:var(--text3)">SALLE D'ATTENTE</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:700;color:var(--accent);margin-top:4px" id="wr-event-name">Course</div>
+      <div style="margin-top:8px">
+        <span style="font-family:'Share Tech Mono',monospace;font-size:22px;letter-spacing:6px;color:#fff;background:var(--bg2);padding:6px 18px;border-radius:4px;border:1px solid var(--accent)" id="wr-event-code">------</span>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">Partagez ce code pour inviter des joueurs</div>
+    </div>
+
+    <div class="panel" style="margin-bottom:12px">
+      <div class="panel-header">
+        <span class="panel-title">Joueurs <span id="wr-player-count">(0/12)</span></span>
+        <span id="wr-status-badge" style="font-size:10px;color:var(--accent);letter-spacing:1px">EN ATTENTE</span>
+      </div>
+      <div class="panel-body" id="wr-players-list" style="min-height:80px"></div>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px">
+      <div class="panel-body" style="font-size:12px;color:var(--text2)">
+        <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px">
+          <span>🏎️ <span id="wr-mode-label">GT Manager</span></span>
+          <span>🔄 <span id="wr-laps-label">55 tours</span></span>
+          <span>👥 <span id="wr-max-label">12 joueurs max</span></span>
+          <span>🤖 <span id="wr-ai-label">12 IA</span></span>
+        </div>
+        <!-- Message hôte -->
+        <div id="wr-host-info" style="display:none;background:rgba(232,160,32,0.08);border:1px solid rgba(232,160,32,0.3);border-radius:3px;padding:8px 10px;font-size:11px;color:var(--accent)">
+          👑 <strong>Vous êtes l'organisateur.</strong> Seul vous pouvez avancer les étapes.<br>
+          <span style="color:var(--text3)">⚠️ Chaque action s'applique immédiatement à tous les joueurs du lobby.</span><br>
+          <span style="color:#e84040;font-weight:600">🔴 Ne fermez pas cet onglet pendant la course — vous êtes le serveur de jeu.</span>
+        </div>
+        <!-- Message joueur -->
+        <div id="wr-player-info" style="display:none;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:3px;padding:8px 10px;font-size:11px;color:var(--text3)">
+          ⏳ En attente que l'organisateur lance la session. Vous serez notifié automatiquement à chaque étape.
+        </div>
+        <!-- Info départ automatique -->
+        <div style="margin-top:8px;font-size:11px;color:var(--text3);border-top:1px solid var(--border);padding-top:8px">
+          🏁 <strong style="color:var(--text2)">Tous les pilotes inscrits prennent le départ</strong> — qu'ils soient connectés ou non.<br>
+          <span style="color:rgba(255,255,255,0.35)">Un joueur absent sera piloté automatiquement pour toute la durée de la course. Il ne pourra pas reprendre le contrôle en cours de route.</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button class="btn" style="flex:1" onclick="leaveEvent()">◄ Quitter</button>
+      <button class="btn" id="wr-ready-btn" style="flex:2" onclick="toggleReady()">✅ JE SUIS PRÊT</button>
+      <button class="btn action" id="wr-start-btn" style="flex:2;display:none" onclick="startMultiRace()">👑 LANCER — Parc Fermé</button>
+    </div>
+    <div style="margin-top:8px;font-size:11px;color:var(--text3);text-align:center" id="wr-ready-status"></div>
+  </div>
+</div>
+
+<!-- PARC FERMÉ SCREEN -->
+<div id="parcferme-screen" style="display:none;align-items:center;justify-content:center;min-height:100vh;background:radial-gradient(ellipse at 50% 40%,#0a1200 0%,#0a0c0f 70%)">
+  <div style="width:520px;max-width:96vw">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:700;letter-spacing:4px;color:var(--accent)">PARC FERMÉ</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:4px;letter-spacing:1px">Ces réglages seront verrouillés pour les qualifications et le départ de course</div>
+      <div id="pf-multi-host-msg" style="display:none;margin-top:10px;background:rgba(232,160,32,0.08);border:1px solid rgba(232,160,32,0.3);border-radius:3px;padding:8px 12px;font-size:11px;color:var(--accent);text-align:left">
+        👑 <strong>Organisateur :</strong> Quand vous cliquerez sur <strong>QUALIFICATIONS</strong>, tous les joueurs du lobby démarreront les qualifications en même temps avec vos réglages de longueur de course.
+      </div>
+      <div id="pf-multi-player-msg" style="display:none;margin-top:10px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:3px;padding:8px 12px;font-size:11px;color:var(--text3);text-align:left">
+        ⏳ Choisissez vos réglages. L'organisateur lancera les qualifications quand tout le monde sera prêt.
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:12px">
+      <div class="panel-header"><span class="panel-title">Pneumatiques <span>de départ</span></span></div>
+      <div class="panel-body">
+        <div class="btn-group" id="pf-tyre-btns">
+          <button class="btn" data-tyre="S" onclick="selectPFTyre(this)"><span class="tyre-dot tyre-S"></span> Soft</button>
+          <button class="btn selected" data-tyre="M" onclick="selectPFTyre(this)"><span class="tyre-dot tyre-M"></span> Medium</button>
+          <button class="btn" data-tyre="H" onclick="selectPFTyre(this)"><span class="tyre-dot tyre-H"></span> Hard</button>
+        </div>
+        <div style="margin-top:10px;font-size:11px;color:var(--text3)" id="pf-tyre-info">Medium — durée de vie ~25 tours, compromis vitesse/longévité</div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:12px">
+      <div class="panel-header"><span class="panel-title">Carburant <span>de départ</span></span></div>
+      <div class="panel-body">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+          <input type="range" id="pf-fuel-slider" min="5" max="120" value="70" step="1"
+            style="flex:1;accent-color:var(--accent);cursor:pointer"
+            oninput="updatePFFuelSlider(this.value)">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:16px;color:var(--accent);min-width:44px;text-align:right" id="pf-fuel-slider-val">70L</div>
+        </div>
+        <div style="margin-top:4px;font-size:11px;color:var(--text3)" id="pf-fuel-info">70L — environ 19 tours d'autonomie</div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:12px">
+      <div class="panel-header"><span class="panel-title">Longueur de <span>course</span></span></div>
+      <div class="panel-body">
+        <div class="btn-group" id="pf-laps-btns">
+          <button class="btn" data-laps="20" onclick="selectPFLaps(this)">20 tours <span style="font-size:9px;color:var(--text3)">Court</span></button>
+          <button class="btn" data-laps="35" onclick="selectPFLaps(this)">35 tours <span style="font-size:9px;color:var(--text3)">Moyen</span></button>
+          <button class="btn selected" data-laps="55" onclick="selectPFLaps(this)">55 tours <span style="font-size:9px;color:var(--text3)">Reco ★</span></button>
+          <button class="btn" data-laps="80" onclick="selectPFLaps(this)">80 tours <span style="font-size:9px;color:var(--text3)">Long</span></button>
+        </div>
+        <div style="margin-top:10px;font-size:11px;color:var(--text3)" id="pf-laps-info">55 tours — ~12 min · 2 arrêts recommandés en Medium</div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:12px">
+      <div class="panel-header"><span class="panel-title">Mode moteur <span>de départ</span></span></div>
+      <div class="panel-body">
+        <div class="btn-group">
+          <button class="btn" data-pfmode="saving" onclick="selectPFMode(this)">Économie <span style="font-size:9px;color:var(--text3)">−0.5%/t</span></button>
+          <button class="btn selected" data-pfmode="normal" onclick="selectPFMode(this)">Normal <span style="font-size:9px;color:var(--text3)">−1.2%/t</span></button>
+          <button class="btn" data-pfmode="attack" onclick="selectPFMode(this)">Attaque <span style="font-size:9px;color:var(--text3)">−3.5%/t</span></button>
+        </div>
+        <div style="margin-top:10px;font-size:11px;color:var(--text3)" id="pf-mode-info">Normal — moteur tient toute la course sans risque</div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <button class="btn" onclick="backToSetup()">◄ Retour</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn" style="font-size:11px;padding:6px 12px;color:var(--text3);border-color:var(--border)" onclick="skipQualif()">⏭ Passer les qualifs</button>
+        <button class="btn action" style="font-size:14px;padding:10px 28px;" onclick="MULTI.eventId ? multiHostStartQualif() : goToQualif()">QUALIFICATIONS ►</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RÉSULTATS QUALIFS -->
+<div id="qualif-results-screen" style="display:none;align-items:center;justify-content:center;min-height:100vh;background:radial-gradient(ellipse at 50% 40%,#1a0800 0%,#0a0c0f 70%)">
+  <div style="width:600px;max-width:96vw">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:700;letter-spacing:4px;color:var(--accent)">RÉSULTATS QUALIFICATIONS</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:4px">Circuit de Valdoria</div>
+    </div>
+    <div id="qualif-results-list" style="margin-bottom:24px"></div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:14px 18px;margin-bottom:20px">
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Réglages parc fermé pour la course</div>
+      <div style="display:flex;gap:20px;font-size:13px" id="pf-summary"></div>
+    </div>
+    <div style="text-align:center">
+      <button class="btn action" style="font-size:15px;padding:12px 40px;" onclick="MULTI.eventId && MULTI.isHost ? multiHostEndQualif() : goToGrid()">GRILLE DE DÉPART ►</button>
+    </div>
+  </div>
+</div>
+
+<!-- QUALIF SCREEN -->
+<div id="qualif-screen" style="display:none">
+  <div id="qualif-header">
+    <div class="logo">Pit Wall <span>Qualifications</span></div>
+    <div id="qualif-clock-display">15:00</div>
+    <div id="header-right">
+      <div class="hstat"><div class="hstat-label">Meilleur tour</div><div class="hstat-val" id="q-best">—</div></div>
+      <div class="hstat"><div class="hstat-label">Dernier tour</div><div class="hstat-val" id="q-last">—</div></div>
+      <div class="hstat"><div class="hstat-label">Position prov.</div><div class="hstat-val" id="q-pos">—</div></div>
+      <div class="hstat"><div class="hstat-label">Tours</div><div class="hstat-val" id="q-laps">0</div></div>
+      <button class="btn danger" style="font-size:11px;padding:4px 10px" onclick="endQualif()">⏭ FIN QUALIFS</button>
+    </div>
+  </div>
+
+  <div id="qualif-body">
+    <div id="qualif-circuit-wrap" class="panel">
+      <canvas id="qualif-canvas"></canvas>
+      <div id="qualif-countdown-overlay" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);z-index:10;flex-direction:column;gap:8px">
+        <div id="qualif-countdown-number" style="font-family:'Barlow Condensed',sans-serif;font-size:100px;font-weight:700;color:#e8a020;line-height:1;text-shadow:0 0 40px rgba(232,160,32,0.8)"></div>
+        <div id="qualif-countdown-label" style="font-family:'Barlow Condensed',sans-serif;font-size:16px;letter-spacing:4px;color:rgba(255,255,255,0.7)">SESSION QUALIFICATIONS</div>
+      </div>
+      <div id="qualif-track-overlay">
+        <div class="track-badge">🏁 <span>CIRCUIT DE VALDORIA — QUALIFICATIONS</span></div>
+        <div class="track-badge" id="q-sector-disp">Secteur 1</div>
+      </div>
+    </div>
+
+    <div id="qualif-right">
+      <!-- Classement provisoire -->
+      <div class="panel" style="margin-bottom:12px">
+        <div class="panel-header"><span class="panel-title">Classement <span>Provisoire</span></span></div>
+        <div class="panel-body" id="qualif-standings" style="padding:4px 8px"></div>
+      </div>
+      <!-- Contrôles -->
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Réglages <span>Qualif</span></span></div>
+        <div class="panel-body">
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">🔒 Parc fermé — réglages verrouillés</div>
+          <div id="q-parcferme-display" style="display:flex;flex-direction:column;gap:6px;font-size:12px"></div>
+          <div style="margin-top:14px" id="q-pit-out-btn">
+            <button class="btn action" style="width:100%;background:var(--green);border-color:var(--green);color:#000" onclick="qExitPits()">🟢 SORTIR DES STANDS</button>
+          </div>
+          <div style="margin-top:8px;display:none" id="q-launch-btn">
+            <button class="btn action" style="width:100%" onclick="qLaunchLap()">🟢 TOUR LANCÉ</button>
+          </div>
+          <div style="margin-top:8px;font-size:11px;color:var(--text3)" id="q-status">En attente — sortez des stands</div>
+          <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border)">
+            <button class="btn danger" style="width:100%;font-size:11px" onclick="endQualif()">⏭ TERMINER LES QUALIFS</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GRID SCREEN -->
+<div id="grid-screen" style="display:none">
+  <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:radial-gradient(ellipse at 50% 40%,#1a0a00 0%,#0a0c0f 70%)">
+    <div style="width:700px;max-width:96vw">
+      <div style="text-align:center;margin-bottom:28px">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:700;letter-spacing:4px;color:var(--accent)">GRILLE DE DÉPART</div>
+        <div style="font-size:13px;color:var(--text3);margin-top:4px">Circuit de Valdoria — Course GT3 Pro</div>
+      </div>
+      <div id="grid-rows"></div>
+      <div style="text-align:center;margin-top:28px">
+        <button class="btn action" id="grid-start-btn" style="font-size:15px;padding:12px 40px;opacity:0.4;pointer-events:none" onclick="MULTI.eventId && MULTI.isHost ? multiHostStartRace() : launchRace()">DÉPART DE LA COURSE ►</button>
+        <div style="font-size:11px;color:var(--text3);margin-top:8px" id="grid-countdown"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN GAME -->
+<div id="game-screen" style="display:none">
+
+  <div id="header">
+    <div class="logo">Pit Wall <span>GT</span></div>
+    <div id="race-clock">00:00:00</div>
+    <div id="header-right">
+      <div class="hstat">
+        <div class="hstat-label">Position</div>
+        <div class="hstat-val" id="h-pos">—</div>
+      </div>
+      <div class="hstat">
+        <div class="hstat-label">Tour</div>
+        <div class="hstat-val" id="h-lap">0 / <span id="h-total-laps">—</span></div>
+      </div>
+      <div class="hstat">
+        <div class="hstat-label">Météo</div>
+        <div class="hstat-val" id="h-weather">☀️</div>
+      </div>
+      <div class="hstat">
+        <div class="hstat-label">Arrêts</div>
+        <div class="hstat-val" id="h-stops">0</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="app">
+    <!-- CIRCUIT -->
+    <div id="circuit-wrap" class="panel">
+      <canvas id="circuit-canvas"></canvas>
+      <div id="sky-overlay"></div>
+      <div id="countdown-overlay" style="display:none;position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);z-index:10;flex-direction:column;gap:8px">
+        <div id="countdown-number" style="font-family:'Barlow Condensed',sans-serif;font-size:120px;font-weight:700;color:#e8a020;line-height:1;text-shadow:0 0 40px rgba(232,160,32,0.8)"></div>
+        <div id="countdown-label" style="font-family:'Barlow Condensed',sans-serif;font-size:18px;letter-spacing:4px;color:rgba(255,255,255,0.7)"></div>
+      </div>
+      <div id="track-info-overlay">
+        <div class="track-badge">🏁 <span id="track-name-badge">CIRCUIT DE VALDORIA</span></div>
+        <div class="track-badge">TOUR RAPIDE : <span id="best-lap-disp">—</span></div>
+        <div class="track-badge">DERNIER TOUR : <span id="last-lap-disp">—</span></div>
+        <div class="track-badge" id="sc-badge" style="display:none">🟡 SAFETY CAR</div>
+      </div>
+    </div>
+
+    <!-- STRATÉGIE -->
+    <div id="strat-panel" class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Stratégie <span>& Commandes</span></span>
+        <span style="font-size:10px;color:var(--text3);" id="strat-pilote-actif"></span>
+      </div>
+      <div class="panel-body" style="overflow-y:auto;max-height:760px">
+
+        <div class="strat-section">
+          <div class="strat-section-title">Pneumatiques planifiés</div>
+          <div class="btn-group" id="tyre-btns">
+            <button class="btn selected" data-tyre="S" onclick="selectTyre(this)"><span class="tyre-dot tyre-S"></span> Slick S</button>
+            <button class="btn" data-tyre="M" onclick="selectTyre(this)"><span class="tyre-dot tyre-M"></span> Slick M</button>
+            <button class="btn" data-tyre="H" onclick="selectTyre(this)"><span class="tyre-dot tyre-H"></span> Slick H</button>
+            <button class="btn" data-tyre="W" onclick="selectTyre(this)"><span class="tyre-dot tyre-W"></span> Pluie</button>
+            <button class="btn" data-tyre="I" onclick="selectTyre(this)"><span class="tyre-dot tyre-I"></span> Inter</button>
+          </div>
+        </div>
+
+        <div class="strat-section">
+          <div class="strat-section-title">Carburant au prochain arrêt</div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+            <input type="range" id="fuel-slider" min="5" max="120" value="60" step="1"
+              style="flex:1;accent-color:var(--accent);cursor:pointer"
+              oninput="updateFuelSlider(this.value)">
+            <div style="font-family:'Share Tech Mono',monospace;font-size:16px;color:var(--accent);min-width:44px;text-align:right" id="fuel-slider-val">60L</div>
+          </div>
+          <div style="font-size:10px;color:var(--text3)" id="fuel-slider-info">~16 tours d'autonomie</div>
+        </div>
+
+        <div class="strat-section" style="display:none">
+          <div class="strat-section-title">Changement de pilote</div>
+          <div class="btn-group" id="driver-btns"></div>
+        </div>
+
+        <div class="strat-section">
+          <div class="strat-section-title">Mode moteur</div>
+          <div class="btn-group">
+            <button class="btn" data-mode="saving" onclick="selectEngineMode(this)">Économie</button>
+            <button class="btn selected" data-mode="normal" onclick="selectEngineMode(this)">Normal</button>
+            <button class="btn" data-mode="attack" onclick="selectEngineMode(this)">Attaque</button>
+          </div>
+        </div>
+
+        <div class="strat-section">
+          <div class="strat-section-title">Agressivité pilote</div>
+          <div class="btn-group">
+            <button class="btn" data-aggro="soft" onclick="selectAggro(this)">🟢 Doux</button>
+            <button class="btn selected" data-aggro="normal" onclick="selectAggro(this)">⚪ Normal</button>
+            <button class="btn" data-aggro="push" onclick="selectAggro(this)">🔴 Push</button>
+          </div>
+        </div>
+
+        <div class="strat-section">
+          <div class="strat-section-title">Batterie hybride</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <div style="flex:1;background:var(--bg4);border-radius:3px;height:8px;overflow:hidden">
+              <div id="battery-bar" style="height:100%;width:50%;border-radius:3px;background:var(--cyan);transition:width 0.5s,background 0.3s"></div>
+            </div>
+            <div id="battery-val" style="font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--cyan);min-width:36px;text-align:right">50%</div>
+          </div>
+          <button id="boost-btn" class="btn" style="width:100%;border-color:var(--cyan);color:var(--cyan)" onclick="activateBoost()">⚡ BOOST</button>
+          <div id="boost-status" style="font-size:10px;color:var(--text3);margin-top:4px;text-align:center">Recharge +0.5%/tour</div>
+        </div>
+
+        <div style="margin-bottom:14px">
+          <button class="btn action" style="width:100%;font-size:14px;padding:9px" onclick="callPitStop()">🛞 APPELER AUX STANDS</button>
+        </div>
+        <div style="margin-bottom:14px">
+          <button class="btn danger" style="width:100%;" onclick="togglePause()">⏸ PAUSE / ▶ REPRENDRE</button>
+        </div>
+
+        <div class="strat-section">
+          <div class="strat-section-title">Télémétrie</div>
+          <div class="telem-grid" id="telem-grid">
+            <div class="telem-card">
+              <div class="telem-label">Carburant</div>
+              <div class="telem-val ok" id="t-fuel">100L</div>
+              <div class="telem-bar"><div class="telem-bar-fill" id="t-fuel-bar" style="width:100%;background:var(--green)"></div></div>
+            </div>
+            <div class="telem-card">
+              <div class="telem-label">Pneus</div>
+              <div class="telem-val ok" id="t-tyres">100%</div>
+              <div class="telem-bar"><div class="telem-bar-fill" id="t-tyre-bar" style="width:100%;background:var(--green)"></div></div>
+            </div>
+            <div class="telem-card">
+              <div class="telem-label">Pilote</div>
+              <div class="telem-val ok" id="t-driver-stamina">100%</div>
+              <div class="telem-bar"><div class="telem-bar-fill" id="t-stamina-bar" style="width:100%;background:var(--green)"></div></div>
+            </div>
+            <div class="telem-card">
+              <div class="telem-label">Moteur</div>
+              <div class="telem-val ok" id="t-engine">OK</div>
+              <div class="telem-bar"><div class="telem-bar-fill" id="t-engine-bar" style="width:100%;background:var(--green)"></div></div>
+            </div>
+            <div class="telem-card">
+              <div class="telem-label">Hybride</div>
+              <div class="telem-val ok" id="t-battery">50%</div>
+              <div class="telem-bar"><div class="telem-bar-fill" id="t-battery-bar" style="width:50%;background:var(--cyan)"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="strat-section">
+          <div class="strat-section-title">Météo</div>
+          <div class="weather-bar">
+            <span class="weather-icon" id="weather-icon">☀️</span>
+            <div>
+              <div id="weather-desc" style="font-size:12px;font-weight:500">Sec · 22°C</div>
+              <div class="weather-detail" id="weather-forecast">Prévision : Stable</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="strat-section">
+          <div class="strat-section-title">Pilotes</div>
+          <div id="driver-display"></div>
+        </div>
+
+        <div class="strat-section">
+          <div class="strat-section-title">Radio Ingénieur</div>
+          <div id="radio-log"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BAS GAUCHE -->
+    <div id="bottom-left">
+      <!-- CLASSEMENT -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Classement</span>
+          <span style="font-size:10px;color:var(--text3)">COURSE EN COURS</span>
+        </div>
+        <div class="panel-body" id="standings-body" style="padding:6px 8px"></div>
+      </div>
+
+      <!-- TEMPS AU TOUR -->
+      <div class="panel">
+        <div class="panel-header" style="justify-content:space-between">
+          <span class="panel-title">Temps au tour</span>
+          <span style="font-size:10px;color:var(--text3)" id="lap-count-label">T0 / 55</span>
+        </div>
+        <div class="panel-body" style="padding:4px 8px">
+          <div style="display:grid;grid-template-columns:22px 60px 60px 40px;gap:2px 6px;font-size:10px;color:var(--text3);padding:2px 0 4px;border-bottom:1px solid var(--border);margin-bottom:4px;">
+            <span>T.</span><span>Temps</span><span>Écart Mel.</span><span>Pneus</span>
+          </div>
+          <div id="lap-history" style="max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:1px"></div>
+        </div>
+      </div>
+
+      <!-- HISTORIQUE ARRÊTS -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Arrêts aux stands</span>
+          <span style="font-size:10px;color:var(--text3)" id="stop-count-label">0 arrêts</span>
+        </div>
+        <div class="panel-body" id="pit-history" style="font-size:11px;color:var(--text2)">
+          <div style="color:var(--text3);font-style:italic">Aucun arrêt effectué</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PIT STOP MODAL -->
+<div id="pit-modal">
+  <div class="modal-box">
+    <div class="modal-title">🛞 Arrêt aux stands</div>
+    <div class="modal-row">
+      <div class="modal-label">Pneumatiques</div>
+      <div id="modal-tyre-display" style="font-size:13px"></div>
+    </div>
+    <div class="modal-row">
+      <div class="modal-label">Carburant</div>
+      <div id="modal-fuel-display" style="font-size:13px;font-family:'Share Tech Mono',monospace"></div>
+    </div>
+    <div class="modal-row">
+      <div class="modal-label">Pilote</div>
+      <div id="modal-driver-display" style="font-size:13px"></div>
+    </div>
+    <div class="modal-row">
+      <div class="modal-label">Durée estimée</div>
+      <div id="modal-duration-display" style="font-size:13px;font-family:'Share Tech Mono',monospace;color:var(--accent)"></div>
+    </div>
+    <div id="modal-warning" style="font-size:11px;color:var(--red);margin-top:6px;display:none"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closePitModal()">Annuler</button>
+      <button class="btn action" onclick="confirmPit()">CONFIRMER ►</button>
+    </div>
+  </div>
+</div>
+
+<!-- END SCREEN -->
+<div id="end-screen">
+  <div class="end-box">
+    <div class="end-title">RACE OVER</div>
+    <div style="font-size:14px;color:var(--text2)">GT Pro Series</div>
+    <div class="end-pos" id="end-pos">1er</div>
+    <div id="end-team" style="font-size:16px;color:var(--text2);margin-bottom:8px"></div>
+    <div class="end-stats" id="end-stats"></div>
+    <button class="btn action" style="margin-top:8px;padding:10px 32px;font-size:14px;" onclick="location.reload()">NOUVELLE COURSE</button>
+  </div>
+</div>
+
+<!-- NOTIFS -->
+<div id="notif-area"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  MULTIJOUEUR — FIREBASE
+// ═══════════════════════════════════════════════════════════
+
+let MULTI = {
+  eventId: null,       // ID de l'événement en cours
+  eventCode: null,     // Code court (6 chars)
+  playerId: null,      // ID unique du joueur
+  isHost: false,       // Est-ce que ce joueur est l'hôte ?
+  eventData: null,     // Données de l'événement
+  listeners: [],       // Listeners Firebase à détacher
+};
+
+// Générer un ID joueur unique
+function getPlayerId() {
+  if(!localStorage.getItem('pw_player_id')) {
+    localStorage.setItem('pw_player_id', 'p_' + Math.random().toString(36).slice(2, 10));
+  }
+  return localStorage.getItem('pw_player_id');
+}
+
+// Générer un code court lisible (6 chars)
+function generateEventCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for(let i=0; i<6; i++) code += chars[Math.floor(Math.random()*chars.length)];
+  return code;
+}
+
+function goToLobby() {
+  document.getElementById('mode-select-screen').style.display = 'none';
+  document.getElementById('lobby-screen').style.display = 'flex';
+  MULTI.playerId = getPlayerId();
+}
+
+function backToModeSelect() {
+  document.getElementById('lobby-screen').style.display = 'none';
+  document.getElementById('mode-select-screen').style.display = 'flex';
+}
+
+async function pwCreateEvent() {
+  const name = document.getElementById('event-name-input').value.trim() || 'Course Pit Wall';
+  const mode = document.getElementById('event-mode-select').value;
+  const laps = parseInt(document.getElementById('event-laps-select').value);
+  const maxPlayers = parseInt(document.getElementById('event-max-players').value);
+  const aiCount = parseInt(document.getElementById('event-ai-count').value);
+  const teamName = document.getElementById('lobby-team-name')?.value.trim() || 'Écurie Blanc';
+
+  const code = generateEventCode();
+  const eventId = 'evt_' + Date.now();
+
+  const eventData = {
+    name, mode, laps, maxPlayers, aiCount, code,
+    status: 'waiting',  // toujours repartir de waiting
+    createdAt: Date.now(),
+    hostId: MULTI.playerId,
+  };
+
+  // Créer l'événement dans Firebase (écrase tout état précédent)
+  await db.ref(`events/${eventId}`).set(eventData);
+
+  // Rejoindre comme hôte
+  await db.ref(`events/${eventId}/players/${MULTI.playerId}`).set({
+    teamName: teamName || 'Écurie Blanc',
+    ready: false,
+    isHost: true,
+    joinedAt: Date.now(),
+  });
+
+  MULTI.eventId = eventId;
+  MULTI.eventCode = code;
+  MULTI.isHost = true;
+  MULTI.eventData = eventData;
+
+  // Adapter GAME_MODE et PF
+  GAME_MODE = mode;
+  PF.laps = laps;
+
+  showWaitingRoom();
+}
+
+async function pwJoinEvent() {
+  const code = document.getElementById('event-code-input').value.trim().toUpperCase();
+  const statusEl = document.getElementById('join-status');
+
+  if(code.length !== 6) {
+    statusEl.textContent = '⚠️ Le code doit faire 6 caractères';
+    statusEl.style.color = 'var(--red)';
+    return;
+  }
+
+  statusEl.textContent = 'Recherche en cours...';
+  statusEl.style.color = 'var(--text3)';
+
+  // Chercher l'événement par code
+  const snapshot = await db.ref('events').orderByChild('code').equalTo(code).once('value');
+  const events = snapshot.val();
+
+  if(!events) {
+    statusEl.textContent = '❌ Aucun événement trouvé avec ce code';
+    statusEl.style.color = 'var(--red)';
+    return;
+  }
+
+  const eventId = Object.keys(events)[0];
+  const eventData = events[eventId];
+
+  if(eventData.status !== 'waiting') {
+    statusEl.textContent = '❌ Cette course a déjà commencé';
+    statusEl.style.color = 'var(--red)';
+    return;
+  }
+
+  const players = eventData.players || {};
+  if(Object.keys(players).length >= eventData.maxPlayers) {
+    statusEl.textContent = '❌ La salle est complète';
+    statusEl.style.color = 'var(--red)';
+    return;
+  }
+
+  const teamName = document.getElementById('lobby-team-name')?.value.trim() || 'Écurie Blanc';
+
+  // Rejoindre
+  await db.ref(`events/${eventId}/players/${MULTI.playerId}`).set({
+    teamName,
+    ready: false,
+    isHost: false,
+    joinedAt: Date.now(),
+  });
+
+  MULTI.eventId = eventId;
+  MULTI.eventCode = code;
+  MULTI.isHost = false;
+  MULTI.eventData = eventData;
+  MULTI.eventData.aiCount = eventData.aiCount ?? 12;
+
+  GAME_MODE = eventData.mode;
+  PF.laps = eventData.laps;
+
+  showWaitingRoom();
+}
+
+function showWaitingRoom() {
+  document.getElementById('lobby-screen').style.display = 'none';
+  document.getElementById('waiting-room-screen').style.display = 'flex';
+
+  document.getElementById('wr-event-name').textContent = MULTI.eventData.name;
+  document.getElementById('wr-event-code').textContent = MULTI.eventCode;
+  document.getElementById('wr-mode-label').textContent = MULTI.eventData.mode === 'gt' ? 'GT Manager' : 'Stock Car';
+  document.getElementById('wr-laps-label').textContent = MULTI.eventData.laps + ' tours';
+  document.getElementById('wr-max-label').textContent = MULTI.eventData.maxPlayers + ' joueurs max';
+  const aiLabel = document.getElementById('wr-ai-label');
+  if(aiLabel) aiLabel.textContent = MULTI.eventData.aiCount > 0 ? `${MULTI.eventData.aiCount} IA` : 'Aucune IA';
+
+  // Afficher le bon message selon le rôle
+  document.getElementById('wr-host-info').style.display = MULTI.isHost ? 'block' : 'none';
+  document.getElementById('wr-player-info').style.display = MULTI.isHost ? 'none' : 'block';
+
+  // Bouton start uniquement pour l'hôte
+  if(MULTI.isHost) {
+    document.getElementById('wr-start-btn').style.display = 'block';
+    document.getElementById('wr-ready-btn').style.display = 'none';
+  }
+
+  // Écouter les joueurs en temps réel
+  const playersRef = db.ref(`events/${MULTI.eventId}/players`);
+  playersRef.on('value', snap => {
+    const players = snap.val() || {};
+    updateWaitingRoomPlayers(players);
+  });
+  MULTI.listeners.push(() => playersRef.off());
+
+  // Écouter les phases — chef d'orchestre PERMANENT (jamais détaché)
+  listenToEventPhase();
+}
+
+function updateWaitingRoomPlayers(players) {
+  const list = document.getElementById('wr-players-list');
+  const count = Object.keys(players).length;
+  document.getElementById('wr-player-count').textContent = `(${count}/${MULTI.eventData.maxPlayers})`;
+
+  const readyCount = Object.values(players).filter(p => p.ready).length;
+  document.getElementById('wr-ready-status').textContent =
+    `${readyCount}/${count} joueurs prêts`;
+
+  list.innerHTML = Object.entries(players).map(([id, p]) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;
+      padding:6px 8px;margin-bottom:4px;border-radius:3px;
+      background:${id === MULTI.playerId ? 'rgba(232,160,32,0.08)' : 'var(--bg3)'};
+      border:1px solid ${id === MULTI.playerId ? 'var(--accent)' : 'var(--border)'}">
+      <span style="font-size:13px;${id === MULTI.playerId ? 'color:var(--accent)' : ''}">
+        ${p.isHost ? '👑 ' : ''}${p.teamName}
+      </span>
+      <span style="font-size:11px;${p.ready ? 'color:var(--green)' : 'color:var(--text3)'}">
+        ${p.ready ? '✅ Prêt' : '⏳ En attente'}
+      </span>
+    </div>
+  `).join('');
+}
+
+async function toggleReady() {
+  const playerRef = db.ref(`events/${MULTI.eventId}/players/${MULTI.playerId}`);
+  const snap = await playerRef.once('value');
+  const current = snap.val();
+  await playerRef.update({ ready: !current.ready });
+
+  const btn = document.getElementById('wr-ready-btn');
+  btn.textContent = !current.ready ? '❌ ANNULER' : '✅ JE SUIS PRÊT';
+}
+
+async function startMultiRace() {
+  if(!MULTI.isHost) return;
+  // L'hôte passe la phase à 'parc_ferme' — tout le monde suit
+  await db.ref(`events/${MULTI.eventId}`).update({
+    status: 'parc_ferme',
+    startedAt: Date.now()
+  });
+}
+
+function startMultiRaceAsPlayer() {
+  // Détacher uniquement les listeners de la salle d'attente (joueurs)
+  // PAS le listener de phase — il doit rester actif pour toute la session
+  MULTI.listeners.forEach(fn => fn());
+  MULTI.listeners = [];
+  document.getElementById('waiting-room-screen').style.display = 'none';
+
+  // Synchroniser le nom d'écurie du lobby
+  const lobbyName = document.getElementById('lobby-team-name')?.value.trim();
+  const setupInput = document.getElementById('team-name-input');
+  if(lobbyName && setupInput) setupInput.value = lobbyName;
+
+  // Initialiser le setup et sélectionner auto voiture + pilote par défaut
+  buildSetupScreen();
+
+  // Sélectionner la première voiture et le premier pilote par défaut
+  selectedCar = CAR_DATA[0];
+  if(DRIVER_DATA.length > 0) selectedDrivers = [DRIVER_DATA[0]];
+
+  // Stocker la liste des joueurs inscrits pour le départ
+  db.ref(`events/${MULTI.eventId}/players`).once('value').then(snap => {
+    const allPlayers = snap.val() || {};
+    MULTI.allRegisteredPlayers = Object.entries(allPlayers)
+      .filter(([id]) => id !== MULTI.playerId)
+      .map(([id, p]) => ({ id, teamName: p.teamName || 'Pilote' }));
+  });
+
+  goToParcFerme();
+}
+
+// ── Chef d'orchestre — écoute les changements de phase Firebase ──
+function listenToEventPhase() {
+  if(!MULTI.eventId) return;
+  // Ce listener est PERMANENT — il n'est jamais dans MULTI.listeners
+  const phaseRef = db.ref(`events/${MULTI.eventId}/status`);
+  phaseRef.on('value', snap => {
+    const phase = snap.val();
+    if(!phase || phase === 'waiting') return;
+
+    // Ne réagir que si on est bien en salle d'attente ou dans une phase cohérente
+    const inWaitingRoom = document.getElementById('waiting-room-screen').style.display !== 'none';
+    const inParcFerme  = document.getElementById('parcferme-screen').style.display !== 'none';
+    const inQualif     = document.getElementById('qualif-screen').style.display !== 'none';
+    const inResults    = document.getElementById('qualif-results-screen').style.display !== 'none';
+    const inGrid       = document.getElementById('grid-screen').style.display !== 'none';
+
+    console.log(`[Multi] Phase → ${phase}`);
+
+    switch(phase) {
+      case 'parc_ferme':
+        if(inWaitingRoom) startMultiRaceAsPlayer();
+        break;
+      case 'qualifying':
+        if(inParcFerme) {
+          db.ref(`events/${MULTI.eventId}/parcferme`).once('value').then(pfSnap => {
+            const pfData = pfSnap.val();
+            if(pfData && !MULTI.isHost) {
+              PF.tyre = pfData.tyre || PF.tyre;
+              PF.laps = pfData.laps || PF.laps;
+              PF.engineMode = pfData.engineMode || PF.engineMode;
+            }
+            goToQualif();
+          });
+        }
+        break;
+      case 'pre_race':
+        if(inQualif) {
+          // Terminer les qualifs et afficher les résultats
+          endQualif();
+        } else if(inParcFerme) {
+          // Si on a sauté les qualifs
+          showQualifResults();
+        }
+        break;
+      case 'racing':
+        // L'hôte lance lui-même via le bouton
+        // Les non-hôtes lancent automatiquement
+        if(!MULTI.isHost) {
+          // Forcer l'affichage de la grille si pas encore là
+          if(inResults) {
+            goToGrid();
+            setTimeout(() => launchRace(), 3500);
+          } else if(inGrid) {
+            setTimeout(() => launchRace(), 1000);
+          } else if(!G || !G.raceTimeMs) {
+            // Pas encore sur la grille — y aller directement
+            showGrid();
+            setTimeout(() => launchRace(), 3500);
+          }
+        } else {
+          // Hôte : lancer directement (il a déjà cliqué le bouton)
+          launchRace();
+        }
+        break;
+    }
+  });
+
+  MULTI.phaseRef = phaseRef; // gardé séparément pour un éventuel cleanup final
+}
+
+// ── Grille commune multi — écoute les chronos de tous les joueurs ──
+function listenToMultiQualifResults() {
+  if(!MULTI.eventId) return;
+
+  const qualifRef = db.ref(`events/${MULTI.eventId}/qualif_results`);
+  qualifRef.on('value', snap => {
+    const results = snap.val() || {};
+
+    // Joueurs humains
+    const humanEntries = Object.entries(results).map(([id, r]) => ({
+      teamName: (id === MULTI.playerId ? '🏎️ ' : '👤 ') + r.teamName,
+      carName: r.carName,
+      best: r.best,
+      isPlayer: id === MULTI.playerId,
+      isHuman: true,
+      tyre: r.tyre || 'M',
+    }));
+
+    // IA avec seed fixe basé sur eventId (même résultats pour tous)
+    const aiCount = MULTI.eventData?.aiCount ?? 12;
+    const aiEntries = generateDeterministicAI(aiCount);
+
+    const all = [...humanEntries, ...aiEntries];
+    all.sort((a, b) => a.best - b.best);
+    QS.results = all;
+
+    showQualifResults();
+  });
+
+  MULTI.qualifResultsRef = qualifRef;
+}
+
+// IA avec résultats déterministes — basés sur un seed fixe
+// Tous les joueurs voient exactement les mêmes IA avec les mêmes chronos
+function generateDeterministicAI(count) {
+  const names = GAME_MODE === 'sc' ? SC_AI_NAMES : QS_AI_NAMES;
+  const AI_TEAM_NAMES = GAME_MODE === 'sc' ? [
+    'Harlow Racing','Thornton SC','Vásquez Speed','Reeves Motorsport',
+    'McCloud Racing','Brannigan SC','Eagle Speed','Lone Racing',
+    'Thunder Team','Iron Racing','Hawk Speed','Star Motorsport',
+    'Redline SC','Vanguard RT','Liberty Speed','Ironhawk Racing',
+    'Bold Racing','Apex Oval','Crest SC','Delta Speed'
+  ] : [
+    'Écurie Rossa','Team Sturmwind','Apex Racing','Nord Motorsport',
+    'Vettura Corse','Beaumont Sport','Serrano Racing','Kronsberg GP',
+    'Cavendish RT','Veloce Team','Hartmann RC','Ferrante Sport'
+  ];
+
+  // Seed basé sur l'eventId — identique pour tous les clients
+  const seed = parseInt(MULTI.eventId.replace(/\D/g,'').slice(-6)) || 123456;
+
+  return Array.from({length: Math.min(count, names.length)}, (_, i) => {
+    // Pseudo-random déterministe basé sur seed + index
+    const r = ((seed * (i+1) * 9301 + 49297) % 233280) / 233280;
+    const spread = (i / names.length - 0.5) * 0.03;
+    const best = getBaseLapTime() * (1 + spread + (r - 0.5) * 0.008) * 1000;
+    return {
+      teamName: `[IA] ${AI_TEAM_NAMES[i] || 'Team '+(i+1)}`,
+      carName: names[i] || 'IA',
+      best,
+      isPlayer: false,
+      isHuman: false,
+      tyre: ['S','M','H'][i % 3],
+    };
+  });
+}
+
+// Nettoyer le listener qualif
+function stopListenToMultiQualifResults() {
+  if(MULTI.qualifResultsRef) {
+    MULTI.qualifResultsRef.off();
+    MULTI.qualifResultsRef = null;
+  }
+}
+async function multiHostStartQualif() {
+  if(!MULTI.isHost) return;
+  // Publier les réglages parc fermé pour synchroniser les non-hôtes
+  await db.ref(`events/${MULTI.eventId}`).update({
+    status: 'qualifying',
+    parcferme: { tyre: PF.tyre, laps: PF.laps, engineMode: PF.engineMode }
+  });
+}
+
+async function multiHostEndQualif() {
+  console.log(`[multiHostEndQualif] isHost=${MULTI.isHost} eventId=${MULTI.eventId}`);
+  // Aller à la grille immédiatement
+  goToGrid();
+  // Notifier Firebase en arrière-plan
+  if(MULTI.isHost && MULTI.eventId) {
+    try {
+      await db.ref(`events/${MULTI.eventId}`).update({ status: 'pre_race' });
+      console.log('[multiHostEndQualif] Firebase updated → pre_race');
+    } catch(e) {
+      console.error('[multiHostEndQualif] Firebase error:', e);
+    }
+  }
+}
+
+async function multiHostStartRace() {
+  console.log(`[multiHostStartRace] isHost=${MULTI.isHost} eventId=${MULTI.eventId}`);
+  // Lancer la course immédiatement
+  launchRace();
+  // Notifier Firebase en arrière-plan
+  if(MULTI.isHost && MULTI.eventId) {
+    try {
+      await db.ref(`events/${MULTI.eventId}`).update({
+        status: 'racing',
+        raceStartAt: Date.now()
+      });
+      console.log('[multiHostStartRace] Firebase updated → racing');
+    } catch(e) {
+      console.error('[multiHostStartRace] Firebase error:', e);
+    }
+  }
+}
+
+async function leaveEvent() {
+  if(MULTI.eventId) {
+    await db.ref(`events/${MULTI.eventId}/players/${MULTI.playerId}`).remove();
+    MULTI.listeners.forEach(fn => fn());
+    MULTI.listeners = [];
+    MULTI.eventId = null;
+  }
+  document.getElementById('waiting-room-screen').style.display = 'none';
+  document.getElementById('lobby-screen').style.display = 'flex';
+}
+
+// ─────────────────────────────────────────────────────────
+//  MULTI — PUBLICATION ET ÉCOUTE DE L'ÉTAT COMPLET
+// ─────────────────────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════
+//  MULTI — LECTURE DE race_state (Cloud Function)
+// ═══════════════════════════════════════════════════════════
+
+MULTI.raceState = null;
+
+function startMultiSync() {
+  if(!MULTI.eventId) return;
+  db.ref(`events/${MULTI.eventId}/race_state`).on('value', snap => {
+    const state = snap.val();
+    if(!state) return;
+    applyRaceStateFromServer(state);
+  });
+  console.log('[Multi] Écoute race_state activée');
+}
+
+function applyRaceStateFromServer(state) {
+  if(!G || !state) return;
+  MULTI.raceState = state;
+
+  if(state.weather !== undefined) {
+    const prev = G.weather;
+    G.weather = state.weather;
+    G.weatherTemp = state.weatherTemp || G.weatherTemp;
+    G.weatherFrontIn = state.weatherFrontIn || G.weatherFrontIn;
+    G.weatherFrontTarget = state.weatherFrontTarget || G.weatherFrontTarget;
+    G.weatherFrontProb = state.weatherFrontProb || G.weatherFrontProb;
+    if(prev !== state.weather) {
+      updateWeatherUI();
+      if(state.weather === 'rain') radioMsg('🌧 Pluie ! Adaptez vos pneus !', 'alert');
+      else if(state.weather === 'dry' && prev !== 'dry') radioMsg('☀️ Piste qui sèche — slicks bientôt ?', 'info');
+    }
+  }
+
+  if(state.safetyCar !== undefined) {
+    const prev = G.safetyCar;
+    G.safetyCar = state.safetyCar;
+    G.safetyCarLapsLeft = state.safetyCarLapsLeft || 0;
+    if(!prev && state.safetyCar) {
+      document.getElementById('sc-badge').style.display = 'inline-block';
+      radioMsg('🟡 Safety Car déployée !', 'info');
+      notify('Safety Car — fenêtre de pit stop !', 'info');
+    } else if(prev && !state.safetyCar) {
+      document.getElementById('sc-badge').style.display = 'none';
+      radioMsg('✅ Safety Car rentrée. Piste libre !', 'info');
+    }
+  }
+
+  if(state.standings && G.competitors) {
+    state.standings.forEach(entry => {
+      let comp = null;
+      if(entry.isAI) {
+        comp = G.competitors.find(c => c.teamName === entry.teamName);
+      } else {
+        comp = G.competitors.find(c => c.playerId === entry.playerId);
+      }
+      if(!comp) return;
+      comp.trackPos = entry.trackPos;
+      comp.distTotal = entry.distTotal;
+      comp.lap = entry.lap;
+      comp.tyreType = entry.tyreType;
+      comp.battery = entry.battery;
+      comp.pitState = entry.pitState || 'racing';
+      comp.pitLanePos = entry.pitLanePos || 0;
+      comp.retired = entry.retired || false;
+    });
+
+    // Position du joueur depuis le serveur
+    const myEntry = state.standings.find(e => e.playerId === MULTI.playerId);
+    if(myEntry) {
+      G.trackPos = myEntry.trackPos;
+      G.distTotal = myEntry.distTotal;
+      G.lap = myEntry.lap;
+    }
+  }
+
+  if(state.finished && !G.finished) {
+    G.finished = true;
+    endRace();
+  }
+}
+
+let _lastDecisionPublish = 0;
+function publishPlayerDecisions() {
+  const now = Date.now();
+  if(now - _lastDecisionPublish < 300) return;
+  _lastDecisionPublish = now;
+  if(!G || !MULTI.eventId) return;
+  db.ref(`events/${MULTI.eventId}/player_decisions/${MULTI.playerId}`).set({
+    teamName: G.teamName,
+    engineMode: G.engineMode,
+    driverAggro: G.driverAggro,
+    pitRequested: G.inPit || false,
+    plannedTyre: G.plannedTyre || G.tyreType,
+    plannedFuel: G.plannedFuel || 60,
+    boostActivated: G.boostActive || false,
+    trackPos: G.trackPos,
+    distTotal: G.distTotal,
+    lap: G.lap,
+    tyre: G.tyreType,
+    battery: Math.round(G.battery),
+    pitState: G.pitState,
+    t: now,
+  });
+}
+
+// Stubs compatibilité
+function publishPlayerState() {}
+function applyRemotePlayerDecisions() {}
+function advanceRemotePlayerCar() {}
+function listenToRemoteDecisions() {}
+function multiClientListenToHostState() {}
+function multiHostPublishState() {}
+function updateMultiStandings() {}
+
+function stopMultiSync() {
+  if(MULTI.eventId) {
+    db.ref(`events/${MULTI.eventId}/race_state`).off();
+    db.ref(`events/${MULTI.eventId}/player_decisions`).off();
+  }
+  if(multiSyncInterval) { clearInterval(multiSyncInterval); multiSyncInterval = null; }
+}
+
+function setupHostDisconnectDetection() {}
+function listenForHostDisconnect() {
+  if(!MULTI.eventId) return;
+  db.ref(`events/${MULTI.eventId}/status`).on('value', snap => {
+    if(snap.val() === 'finished' && G && !G.finished) endRace();
+  });
+}
+
+let GAME_MODE = 'gt'; // 'gt' | 'sc'
+
+function selectMode(mode) {
+  GAME_MODE = mode;
+  document.getElementById('mode-select-screen').style.display = 'none';
+  document.getElementById('setup-screen').style.display = 'flex';
+
+  if(mode === 'sc') {
+    // Adapter le setup pour Stock Car
+    document.querySelector('.setup-title').textContent = 'Stock Car';
+    document.querySelector('.setup-sub').textContent = 'Pit Wall · Oval Series';
+    // Remplacer les données voitures/pilotes/IA par Stock Car
+    applyStockCarData();
+  } else {
+    document.querySelector('.setup-title').textContent = 'GT Racing';
+    document.querySelector('.setup-sub').textContent = 'Racing Manager · GT Pro Series';
+  }
+  buildSetupScreen();
+}
+
+// ── Données Stock Car ──
+const SC_CAR_DATA = [
+  { id:'ironhawk',   name:'Ironhawk SC-V8',    class:'Oval Series', speed:90, fuel:90, reliability:88, fuelCap:80, lapBase:32 },
+  { id:'thunderbolt',name:'Thunderbolt SC',     class:'Oval Series', speed:92, fuel:88, reliability:86, fuelCap:80, lapBase:32 },
+  { id:'lonestar',   name:'Lone Star SC-500',   class:'Oval Series', speed:91, fuel:91, reliability:90, fuelCap:80, lapBase:32 },
+];
+
+const SC_DRIVER_DATA = [
+  { id:'harlow',    name:'Bobby Harlow',    nat:'🇺🇸', pace:90, consistency:88, rain:75, tyre:85, stamina:92, aggro:88 },
+  { id:'thornton',  name:'Jake Thornton',   nat:'🇺🇸', pace:86, consistency:92, rain:72, tyre:90, stamina:90, aggro:75 },
+  { id:'vasquez',   name:'Rico Vásquez',    nat:'🇲🇽', pace:92, consistency:82, rain:78, tyre:82, stamina:86, aggro:95 },
+  { id:'reeves',    name:'Danny Reeves',    nat:'🇺🇸', pace:84, consistency:94, rain:80, tyre:88, stamina:94, aggro:70 },
+  { id:'mccloud',   name:'Travis McCloud',  nat:'🇺🇸', pace:88, consistency:86, rain:74, tyre:86, stamina:88, aggro:85 },
+  { id:'brannigan', name:'Cody Brannigan',  nat:'🇨🇦', pace:85, consistency:90, rain:82, tyre:84, stamina:92, aggro:78 },
+];
+
+const SC_AI_NAMES = [
+  'Ironhawk #2','Thunderbolt #17','Lone Star #11','Ironhawk #48',
+  'Thunderbolt #22','Lone Star #18','Ironhawk #3','Thunderbolt #41',
+  'Lone Star #19','Ironhawk #24','Thunderbolt #12','Lone Star #54',
+  'Ironhawk #88','Thunderbolt #4','Lone Star #20','Ironhawk #9',
+  'Thunderbolt #6','Lone Star #23','Ironhawk #5','Thunderbolt #38',
+];
+
+function applyStockCarData() {
+  // On swap les données globales
+  Object.assign(CAR_DATA, SC_CAR_DATA);
+  CAR_DATA.length = SC_CAR_DATA.length;
+  SC_CAR_DATA.forEach((c, i) => CAR_DATA[i] = c);
+  Object.assign(DRIVER_DATA, SC_DRIVER_DATA);
+  DRIVER_DATA.length = SC_DRIVER_DATA.length;
+  SC_DRIVER_DATA.forEach((d, i) => DRIVER_DATA[i] = d);
+}
+// ═══════════════════════════════════════════════════════════
+//  TEMPS DE BASE — référence unique par mode
+// ═══════════════════════════════════════════════════════════
+const BASE_LAP_TIME = 128;    // GT — secondes
+const BASE_LAP_TIME_SC = 32;  // Stock Car ovale — secondes
+
+// Fonction qui retourne le bon temps de base selon le mode
+function getBaseLapTime() {
+  return GAME_MODE === 'sc' ? BASE_LAP_TIME_SC : BASE_LAP_TIME;
+}
+
+// ── Circuit ovale Stock Car — Tri-oval style Daytona ──
+const OVAL_PATH = [
+  [0.72, 0.18],[0.62, 0.13],[0.50, 0.11],[0.38, 0.12],[0.27, 0.17],
+  [0.18, 0.24],[0.15, 0.33],[0.14, 0.42],[0.16, 0.51],
+  [0.21, 0.60],[0.28, 0.69],[0.38, 0.76],[0.50, 0.80],[0.62, 0.79],
+  [0.72, 0.74],[0.79, 0.66],[0.83, 0.56],[0.83, 0.44],
+  [0.81, 0.33],[0.77, 0.24],[0.72, 0.18],
+];
+
+const OVAL_CORNER_LABELS = [
+  { t: 0.07, label: 'Turn 1-2' },
+  { t: 0.37, label: 'Turn 3-4' },
+  { t: 0.65, label: 'Front Stretch' },
+  { t: 0.25, label: 'Back Stretch' },
+];
+
+// Couleurs vives style NASCAR
+const SC_CAR_COLORS = [
+  '#ff2222','#2266ff','#ff8800','#22bb22','#ff22bb',
+  '#22bbbb','#ffcc00','#8822ff','#ff4488','#44ff88',
+  '#ff6622','#6622ff','#22ff66','#cc2244','#4422cc',
+  '#ccaa00','#00ccaa','#aa00cc','#cc4400','#00aacc',
+];
+const CAR_DATA = [
+  { id:'serrano',   name:'Serrano GT3-R',   class:'GT Pro Series', speed:90, fuel:88, reliability:87, fuelCap:120, lapBase:2*60+8 },
+  { id:'kronsberg',  name:'Kronsberg GT3',     class:'GT Pro Series', speed:88, fuel:92, reliability:91, fuelCap:115, lapBase:2*60+10 },
+  { id:'cavendish',  name:'Cavendish GT3',     class:'GT Pro Series', speed:86, fuel:95, reliability:93, fuelCap:118, lapBase:2*60+12 }
+];
+
+const DRIVER_DATA = [
+  { id:'delacroix', name:'Marco Delacroix',  nat:'🇫🇷', pace:88, consistency:85, rain:80, tyre:82, stamina:90, aggro:75 },
+  { id:'nakamura',  name:'Hiroshi Nakamura', nat:'🇯🇵', pace:92, consistency:92, rain:88, tyre:95, stamina:85, aggro:70 },
+  { id:'vega',      name:'Carlos Vega',      nat:'🇪🇸', pace:85, consistency:90, rain:85, tyre:90, stamina:92, aggro:80 },
+  { id:'beaumont',  name:'James Beaumont',   nat:'🇬🇧', pace:80, consistency:88, rain:92, tyre:85, stamina:88, aggro:65 },
+  { id:'ferrante',  name:'Luca Ferrante',    nat:'🇮🇹', pace:94, consistency:78, rain:76, tyre:82, stamina:80, aggro:92 },
+  { id:'steinberg', name:'Kai Steinberg',    nat:'🇩🇪', pace:87, consistency:94, rain:90, tyre:88, stamina:94, aggro:68 }
+];
+
+const TYRE_PROPS = {
+  S: { name:'Slick Soft',   color:'#e8e020', degradPerLap:6.5, lapBonus:-5,  wetPenalty:30 },
+  M: { name:'Slick Medium', color:'#e8a020', degradPerLap:4.0, lapBonus:-2,  wetPenalty:25 },
+  H: { name:'Slick Hard',   color:'#c8c8c8', degradPerLap:2.8, lapBonus:4,   wetPenalty:20 },
+  W: { name:'Pluie',        color:'#3ca8e8', degradPerLap:3.3, lapBonus:15,  wetPenalty:-20 },
+  I: { name:'Interméd.',    color:'#3ce8d4', degradPerLap:5.0, lapBonus:8,   wetPenalty:-5 }
+};
+
+// ═══════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════
+let G = {}; // game state
+
+function initGameState(teamName, car, drivers) {
+  const TOTAL_LAPS = PF.laps || 55;
+  G = {
+    teamName, car, drivers,
+    currentDriverIdx: 0,
+    lap: 0,
+    totalLaps: TOTAL_LAPS,
+    raceTimeMs: 0,
+    paused: false,
+    finished: false,
+
+    // Car state
+    fuel: car.fuelCap,
+    fuelCap: car.fuelCap,
+    tyreType: 'M',
+    tyreWear: 100,
+    engineHealth: 100,
+    engineOverheat: 0,
+    inPit: false,
+    pitStopCount: 0,
+    pitHistory: [],
+
+    // Strategy plans
+    plannedTyre: 'M',
+    plannedFuel: 60,
+    plannedDriverChange: false,
+
+    // Engine mode
+    engineMode: PF.engineMode || 'normal',
+
+    // Agressivité pilote
+    driverAggro: 'normal',  // 'soft' | 'normal' | 'push'
+
+    // Batterie hybride
+    battery: 50,            // démarre à 50%
+    boostActive: false,
+    boostTimeLeft: 0,       // ms réelles restantes du boost
+
+    // Driver stamina (1 seul pilote en GT3)
+    driverStamina: [100],
+
+    // Best lap
+    bestLapMs: null,
+    lastLapMs: null,
+    lapStartMs: 0,
+
+    // Météo — système de fronts évolutifs
+    weather: 'dry',
+    weatherTemp: 20 + Math.floor(Math.random()*14),
+    weatherFrontIn: 8 + Math.random() * 12,
+    weatherFrontTarget: 'dry',
+    weatherFrontProb: 0,
+    weatherAnnounced3: false,
+    weatherAnnounced2: false,
+    weatherAnnounced1: false,
+    safetyCar: false,
+    safetyCarLapsLeft: 0,
+
+    // AI competitors
+    competitors: generateCompetitors(car, TOTAL_LAPS),
+
+    lapDurationMs: 0,
+    trackPos: 0,
+    distTotal: 0,
+    pitState: 'racing',  // 'racing' | 'entering' | 'inPit' | 'exiting'
+    pitLanePos: 0,       // 0-1 sur PIT_LANE_PATH
+    lapHistory: [], // { lap, timeMs, tyre, sc, pit }
+    totalPitTime: 0,
+  };
+}
+
+function generateCompetitors(playerCar, totalLaps) {
+  const names = GAME_MODE === 'sc'
+    ? SC_AI_NAMES.map(n => [n, 'Oval Series'])
+    : [
+        ['Serrano GT3-R #11','GT Pro'],['Kronsberg GT3 #56','GT Pro'],['Cavendish GT3 #42','GT Pro'],
+        ['Serrano GT3-R #63','GT Pro'],['Kronsberg GT3 #7','GT Pro'], ['Cavendish GT3 #59','GT Pro'],
+        ['Serrano GT3-R #19','GT Pro'],['Kronsberg GT3 #33','GT Pro'],['Cavendish GT3 #84','GT Pro'],
+        ['Serrano GT3-R #88','GT Pro'],['Kronsberg GT3 #23','GT Pro'],['Cavendish GT3 #14','GT Pro']
+      ];
+  const AI_TEAM_NAMES_GT = [
+    'Écurie Rossa','Team Sturmwind','Apex Racing','Nord Motorsport',
+    'Vettura Corse','Beaumont Sport','Serrano Racing','Kronsberg GP',
+    'Cavendish RT','Veloce Team','Hartmann RC','Ferrante Sport'
+  ];
+  const AI_TEAM_NAMES_SC = [
+    'Harlow Racing','Thornton SC','Vásquez Speed','Reeves Motorsport',
+    'McCloud Racing','Brannigan SC','Eagle Speed','Lone Racing',
+    'Thunder Team','Iron Racing','Hawk Speed','Star Motorsport',
+    'Redline SC','Vanguard RT','Liberty Speed','Ironhawk Racing',
+    'Bold Racing','Apex Oval','Crest SC','Delta Speed'
+  ];
+  const aiTeamNames = GAME_MODE === 'sc' ? AI_TEAM_NAMES_SC : AI_TEAM_NAMES_GT;
+
+  return names.map((n,i) => {
+    const speedDelta = (Math.random()-0.5) * getBaseLapTime() * 0.08;
+    return {
+      id: i,
+      name: n[0],                          // nom voiture (pour le canvas)
+      teamName: `[IA] ${aiTeamNames[i] || 'Team ' + (i+1)}`, // nom équipe pour classement
+      class: n[1],
+      lapBase: getBaseLapTime() + speedDelta,
+      lap: 0, trackPos: 0, distTotal: 0,
+      fuel: playerCar.fuelCap * 0.9,
+      fuelCap: playerCar.fuelCap,
+      tyreWear: 100,
+      tyreType: ['S','M','H'][Math.floor(Math.random()*3)],
+      pitPlan: 22 + Math.floor(Math.random()*8),
+      pitCount: 0, retired: false,
+      retiredReason: '', position: i+1, totalTimeMs: 0,
+      battery: 50,
+    };
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SETUP SCREEN
+// ═══════════════════════════════════════════════════════════
+let selectedCar = CAR_DATA[0];
+let selectedDrivers = [];
+
+function buildSetupScreen() {
+  const carSel = document.getElementById('car-selector');
+  const drvSel = document.getElementById('driver-selector');
+  carSel.innerHTML = '';
+  drvSel.innerHTML = '';
+  selectedCar = CAR_DATA[0];
+  selectedDrivers = [];
+
+  CAR_DATA.forEach(c => {
+    const d = document.createElement('div');
+    d.className = 'car-card' + (c===selectedCar?' selected':'');
+    d.innerHTML = `
+      <div class="car-card-name">${c.name}</div>
+      <div class="car-card-class">${c.class}</div>
+      <div class="car-stat-row"><span>Vitesse</span><span>${c.speed}</span></div>
+      <div class="car-stat-bar"><div class="car-stat-fill" style="width:${c.speed}%"></div></div>
+      <div class="car-stat-row"><span>Fiabilité</span><span>${c.reliability}</span></div>
+      <div class="car-stat-bar"><div class="car-stat-fill" style="width:${c.reliability}%"></div></div>
+      <div class="car-stat-row"><span>Éco carbu.</span><span>${c.fuel}</span></div>
+      <div class="car-stat-bar"><div class="car-stat-fill" style="width:${c.fuel}%"></div></div>
+    `;
+    d.onclick = () => {
+      selectedCar = c;
+      document.querySelectorAll('.car-card').forEach(x=>x.classList.remove('selected'));
+      d.classList.add('selected');
+    };
+    carSel.appendChild(d);
+  });
+
+  DRIVER_DATA.forEach(dr => {
+    const d = document.createElement('div');
+    d.className = 'driver-card';
+    d.innerHTML = `
+      <div class="driver-card-name">${dr.nat} ${dr.name}</div>
+      <div class="driver-card-nat">Rythme ${dr.pace} · Régularité ${dr.consistency}</div>
+      <div class="driver-card-skills">
+        <span class="skill-tag rain">🌧 Pluie ${dr.rain}</span>
+        <span class="skill-tag tire">🛞 Pneus ${dr.tyre}</span>
+        <span class="skill-tag" style="color:#e8603c;border-color:#e8603c33">⚡ Agressivité ${dr.aggro}</span>
+      </div>
+    `;
+    d.onclick = () => {
+      selectedDrivers = [dr];
+      document.querySelectorAll('.driver-card').forEach(x=>x.classList.remove('selected'));
+      d.classList.add('selected');
+    };
+    drvSel.appendChild(d);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PARC FERMÉ — réglages verrouillés qualifs → course
+// ═══════════════════════════════════════════════════════════
+let PF = {
+  tyre: 'M',
+  fuel: 70,
+  engineMode: 'normal',
+  laps: 55,
+};
+
+const PF_TYRE_INFO = {
+  S: 'Soft — durée de vie ~15 tours, gain de temps mais 3 arrêts nécessaires',
+  M: 'Medium — durée de vie ~25 tours, compromis vitesse/longévité',
+  H: 'Hard — durée de vie ~35 tours, plus lent mais 1 seul arrêt possible',
+};
+const PF_FUEL_INFO = {
+  40:  '40L — ~11 tours d\'autonomie, voiture légère (+0s carbu)',
+  70:  '70L — ~19 tours d\'autonomie, équilibré (+1.8s carbu)',
+  100: '100L — ~27 tours d\'autonomie, lourd (+2.5s carbu)',
+  120: '120L — plein max, ~33 tours, très lourd (+3s carbu)',
+};
+const PF_MODE_INFO = {
+  saving: 'Économie — moteur récupère 0.5%/tour, +5s par tour',
+  normal: 'Normal — moteur tient toute la course sans risque, 0s',
+  attack: 'Attaque — −3s par tour mais moteur s\'use 3.5%/tour (~28 tours max)',
+};
+const PF_LAPS_INFO = {
+  20: '20 tours — ~4 min · 1 arrêt suffit, idéal pour tester rapidement',
+  35: '35 tours — ~8 min · 1-2 arrêts selon les pneus',
+  55: '55 tours — ~12 min · 2 arrêts recommandés en Medium ★',
+  80: '80 tours — ~18 min · 3 arrêts, stratégie longue distance',
+};
+
+function goToParcFerme() {
+  const tn = document.getElementById('team-name-input').value.trim() || 'Racing Team';
+  if(selectedDrivers.length < 1) { alert('Choisissez un pilote !'); return; }
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('parcferme-screen').style.display = 'flex';
+  // Afficher les messages multi selon le rôle
+  const hostMsg = document.getElementById('pf-multi-host-msg');
+  const playerMsg = document.getElementById('pf-multi-player-msg');
+  if(MULTI.eventId) {
+    if(hostMsg) hostMsg.style.display = MULTI.isHost ? 'block' : 'none';
+    if(playerMsg) playerMsg.style.display = MULTI.isHost ? 'none' : 'block';
+  }
+  updatePFDisplay();
+}
+
+function backToSetup() {
+  document.getElementById('parcferme-screen').style.display = 'none';
+  document.getElementById('setup-screen').style.display = 'flex';
+}
+
+function selectPFTyre(btn) {
+  document.querySelectorAll('#pf-tyre-btns .btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  PF.tyre = btn.dataset.tyre;
+  updatePFDisplay();
+}
+
+function updatePFFuelSlider(val) {
+  val = parseInt(val);
+  PF.fuel = val;
+  const valEl = document.getElementById('pf-fuel-slider-val');
+  if(valEl) valEl.textContent = val + 'L';
+  const fuelPerLap = 100 / 28;
+  const tours = Math.round(val / fuelPerLap);
+  const fi = document.getElementById('pf-fuel-info');
+  if(fi) fi.textContent = `${val}L — environ ${tours} tours d'autonomie`;
+}
+
+function selectPFFuel(val) {
+  PF.fuel = parseInt(val);
+  const slider = document.getElementById('pf-fuel-slider');
+  if(slider) { slider.value = val; updatePFFuelSlider(val); }
+}
+
+function selectPFMode(btn) {
+  document.querySelectorAll('[data-pfmode]').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  PF.engineMode = btn.dataset.pfmode;
+  updatePFDisplay();
+}
+
+function selectPFLaps(btn) {
+  document.querySelectorAll('#pf-laps-btns .btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  PF.laps = parseInt(btn.dataset.laps);
+  updatePFDisplay();
+}
+
+function skipQualif() {
+  // Génère des résultats qualifs fictifs sans session
+  const tn = document.getElementById('team-name-input').value.trim() || 'Racing Team';
+  if(selectedDrivers.length < 1) { alert('Choisissez un pilote !'); return; }
+  const aiCars = generateQualifAI(selectedCar);
+  // Donner un temps fictif à chaque IA basé sur son potential
+  const all = [
+    { name: tn, best: (BASE_LAP_TIME + TYRE_PROPS[PF.tyre].lapBonus + (PF.engineMode==='attack'?-3:0)) * 1000 * (0.998 + Math.random()*0.004), isPlayer: true, tyre: PF.tyre },
+    ...aiCars.map(ai => ({ name: ai.name, isPlayer: false, best: ai.potential * 1000 * (0.998 + Math.random()*0.004), tyre: ['S','M','H'][Math.floor(Math.random()*3)] }))
+  ];
+  all.sort((a, b) => a.best - b.best);
+  QS = { teamName: tn, car: selectedCar, driver: selectedDrivers[0], results: all, aiCars, bestLapMs: all.find(c=>c.isPlayer)?.best };
+  document.getElementById('parcferme-screen').style.display = 'none';
+  showQualifResults();
+}
+
+function updatePFDisplay() {
+  const ti = document.getElementById('pf-tyre-info');
+  const mi = document.getElementById('pf-mode-info');
+  const li = document.getElementById('pf-laps-info');
+  if(ti) ti.textContent = PF_TYRE_INFO[PF.tyre] || '';
+  if(mi) mi.textContent = PF_MODE_INFO[PF.engineMode] || '';
+  if(li) li.textContent = PF_LAPS_INFO[PF.laps] || '';
+  // Mettre à jour le slider carburant
+  const slider = document.getElementById('pf-fuel-slider');
+  if(slider) { slider.value = PF.fuel; updatePFFuelSlider(PF.fuel); }
+}
+
+function goToQualif() {
+  const tn = document.getElementById('team-name-input').value.trim() || 'Racing Team';
+  if(selectedDrivers.length < 1) { alert('Choisissez un pilote !'); return; }
+  QS = {
+    teamName: tn,
+    car: selectedCar,
+    driver: selectedDrivers[0],
+    timeLeftMs: 15 * 60 * 1000,
+    paused: false,
+    finished: false,
+    trackPos: 0,
+    distTotal: 0,
+    pitState: 'inPit',
+    pitLanePos: 0.5,
+    onLap: false,
+    lapArmed: false,
+    lapStartDist: 0,
+    lapCount: 0,
+    bestLapMs: null,
+    lastLapMs: null,
+    currentSector: 0,
+    sectorTimes: [],
+    tyreType: PF.tyre,
+    engineMode: PF.engineMode,
+    aiCars: generateQualifAI(selectedCar),
+    results: [],
+  };
+  document.getElementById('parcferme-screen').style.display = 'none';
+  document.getElementById('qualif-screen').style.display = 'flex';
+
+  // Résumé parc fermé en lecture seule
+  const pfDisp = document.getElementById('q-parcferme-display');
+  if(pfDisp) pfDisp.innerHTML = `
+    <div><span style="color:var(--text3)">Pneus :</span> <span class="tyre-badge" style="margin-left:4px"><span class="tyre-dot tyre-${PF.tyre}"></span>${TYRE_PROPS[PF.tyre].name}</span></div>
+    <div><span style="color:var(--text3)">Carburant :</span> <span style="font-family:'Share Tech Mono',monospace;margin-left:4px">${PF.fuel}L</span></div>
+    <div><span style="color:var(--text3)">Moteur :</span> <span style="margin-left:4px">${PF.engineMode === 'attack' ? 'Attaque' : PF.engineMode === 'saving' ? 'Économie' : 'Normal'}</span></div>
+  `;
+
+  initQualifCanvas();
+  updateQualifStandings();
+  QS.paused = true;
+  showCountdown('qualif-countdown-number', 'qualif-countdown-label', 'qualif-countdown-overlay', [
+    { num: '3', duration: 1000 },
+    { num: '2', duration: 1000 },
+    { num: '1', duration: 1000 },
+    { num: 'GO !', duration: 700 },
+  ], () => {
+    QS.paused = false;
+    qLastTs = performance.now();
+  });
+  requestAnimationFrame(qualifLoop);
+}
+
+// ── État qualif global ──
+let QS = {};
+let qCtx, qCw, qCh;
+let qBgCanvas = null;
+let qLastTs = 0;
+
+function initQualifCanvas() {
+  const canvas = document.getElementById('qualif-canvas');
+  const wrap = document.getElementById('qualif-circuit-wrap');
+  qCw = wrap.clientWidth; qCh = wrap.clientHeight;
+  canvas.width = qCw; canvas.height = qCh;
+  qCtx = canvas.getContext('2d');
+  qBgCanvas = null; // force re-prerender avec bonnes dimensions
+  prerenderQualifBg();
+}
+
+function prerenderQualifBg() {
+  qBgCanvas = document.createElement('canvas');
+  qBgCanvas.width = qCw; qBgCanvas.height = qCh;
+  const bg = qBgCanvas.getContext('2d');
+
+  // Dessiner directement sur qBgCanvas avec qCw/qCh comme dimensions
+  // Sans toucher aux globales cw/ch/bgCanvas
+  const W = qCw, H = qCh;
+  const isSC = GAME_MODE === 'sc';
+  const path = isSC ? OVAL_PATH : CIRCUIT_PATH;
+
+  function layer(width, color) {
+    bg.beginPath();
+    bg.moveTo(path[0][0]*W, path[0][1]*H);
+    for(let i=1;i<path.length;i++) bg.lineTo(path[i][0]*W, path[i][1]*H);
+    if(isSC) bg.closePath();
+    bg.strokeStyle = color; bg.lineWidth = width;
+    bg.lineCap = 'round'; bg.lineJoin = 'round'; bg.stroke();
+  }
+
+  // Fond
+  if(isSC) {
+    bg.fillStyle = '#111'; bg.fillRect(0, 0, W, H);
+    bg.beginPath(); bg.ellipse(W*0.49, H*0.46, W*0.28, H*0.28, 0, 0, Math.PI*2);
+    bg.fillStyle = '#1a2e1a'; bg.fill();
+  } else {
+    bg.fillStyle = '#1a2a1a'; bg.fillRect(0, 0, W, H);
+  }
+
+  // Couches piste
+  layer(38, isSC ? '#1e1e1e' : '#2e2e22');
+  layer(30, isSC ? '#282828' : '#26262a');
+  if(isSC) { layer(28, '#cccccc'); layer(24, '#3a3a3a'); }
+  layer(18, isSC ? '#2a2a2a' : '#3e4450');
+
+  // Pit lane
+  const pitPath = getPitConfig().PATH;
+  bg.beginPath();
+  bg.moveTo(pitPath[0][0]*W, pitPath[0][1]*H);
+  for(let i=1;i<pitPath.length;i++) bg.lineTo(pitPath[i][0]*W, pitPath[i][1]*H);
+  bg.strokeStyle = '#2e3040'; bg.lineWidth = 11; bg.lineCap='round'; bg.lineJoin='round'; bg.stroke();
+  bg.beginPath();
+  bg.moveTo(pitPath[0][0]*W, pitPath[0][1]*H);
+  for(let i=1;i<pitPath.length;i++) bg.lineTo(pitPath[i][0]*W, pitPath[i][1]*H);
+  bg.strokeStyle = '#383d4a'; bg.lineWidth = 8; bg.stroke();
+
+  // Ligne départ/arrivée
+  const sfT = 0.005;
+  const n = path.length - 1;
+  const si = Math.floor(sfT * n);
+  const sa = path[si], sb = path[Math.min(si+1,n)];
+  const sf = sfT * n - si;
+  const sfx = (sa[0]+(sb[0]-sa[0])*sf)*W;
+  const sfy = (sa[1]+(sb[1]-sa[1])*sf)*H;
+  const sa2 = path[Math.max(si-1,0)], sb2 = path[Math.min(si+1,n)];
+  const sfAngle = Math.atan2((sb2[1]-sa2[1])*H, (sb2[0]-sa2[0])*W);
+  bg.save(); bg.translate(sfx, sfy); bg.rotate(sfAngle);
+  for(let row=0;row<5;row++) for(let col=0;col<4;col++) {
+    bg.fillStyle = (row+col)%2===0?'#ffffff':'#000000';
+    bg.fillRect(-9+col*4, -8+row*4, 4, 4);
+  }
+  bg.restore();
+}
+
+function generateQualifAI(playerCar) {
+  // En mode multi : pas d'IA en qualifs
+  // Les IA seront générées par l'hôte au moment de la grille
+  if(MULTI.eventId) return [];
+
+  const names = GAME_MODE === 'sc' ? SC_AI_NAMES : QS_AI_NAMES;
+  const AI_TEAM_NAMES_GT = [
+    'Écurie Rossa','Team Sturmwind','Apex Racing','Nord Motorsport',
+    'Vettura Corse','Beaumont Sport','Serrano Racing','Kronsberg GP',
+    'Cavendish RT','Veloce Team','Hartmann RC','Ferrante Sport'
+  ];
+  const AI_TEAM_NAMES_SC = [
+    'Harlow Racing','Thornton SC','Vásquez Speed','Reeves Motorsport',
+    'McCloud Racing','Brannigan SC','Eagle Speed','Lone Racing',
+    'Thunder Team','Iron Racing','Hawk Speed','Star Motorsport',
+    'Redline SC','Vanguard RT','Liberty Speed','Ironhawk Racing',
+    'Bold Racing','Apex Oval','Crest SC','Delta Speed'
+  ];
+  const aiTeamNames = GAME_MODE === 'sc' ? AI_TEAM_NAMES_SC : AI_TEAM_NAMES_GT;
+  return names.map((name, i) => {
+    const spread = (i / names.length - 0.5) * 0.03;
+    const noise = (Math.random() - 0.5) * 0.008;
+    const rawPotential = getBaseLapTime() * (1 + spread + noise);
+    const tyreChoice = Math.random() < 0.6 ? 'S' : 'M';
+    const modeChoice = Math.random() < 0.7 ? 'attack' : 'normal';
+    const tyreProp = TYRE_PROPS[tyreChoice];
+    const modeBonus = modeChoice === 'attack' ? (GAME_MODE === 'sc' ? -0.5 : -3) : 0;
+    const potential = rawPotential + tyreProp.lapBonus * (GAME_MODE === 'sc' ? 0.1 : 1) + modeBonus;
+    const exitAt = 870000 - i * (GAME_MODE === 'sc' ? 20000 : 35000);
+    return {
+      name,
+      teamName: `[IA] ${aiTeamNames[i] || 'Team ' + (i+1)}`,
+      color: (GAME_MODE === 'sc' ? SC_CAR_COLORS : CAR_COLORS)[i % 20],
+      trackPos: 0, distTotal: 0,
+      pitState: 'inPit', pitLanePos: 0.5,
+      bestLapMs: null, lapCount: 0,
+      onLap: false, lapStartDist: 0,
+      exitAt, nextLapAt: exitAt - (potential * 1000) - 5000,
+      potential, retired: false,
+    };
+  });
+}
+
+const QS_AI_NAMES = [
+  'Valdoria #11','Kronsberg #56','Cavendish #42','Valdoria #63','Kronsberg #7',
+  'Cavendish #59','Valdoria #19','Kronsberg #33','Cavendish #84',
+  'Valdoria #88','Kronsberg #23','Cavendish #14'
+];
+
+// ── Boucle qualif ──
+function qualifLoop(ts) {
+  if(QS.finished) return;
+  requestAnimationFrame(qualifLoop);
+  const dt = Math.min(ts - qLastTs, 100);
+  qLastTs = ts;
+  if(QS.paused) { drawQualifCircuit(); return; }
+
+  // Temps restant
+  QS.timeLeftMs -= dt * 9; // même multiplicateur x9
+  if(QS.timeLeftMs <= 0) {
+    QS.timeLeftMs = 0;
+    endQualif();
+    return;
+  }
+
+  // Avancer le joueur — même vitesse toujours, onLap contrôle uniquement la mesure
+  const lapMs = computeQualifLapTime() * 1000;
+  const delta = (dt * 9) / lapMs;
+
+  if(QS.pitState === 'exiting') {
+    QS.pitLanePos += delta * 2;
+    if(QS.pitLanePos >= 1) {
+      QS.pitState = 'racing';
+      QS.trackPos = getPitExitT();
+      QS.distTotal = getPitExitT();
+      document.getElementById('q-pit-out-btn').style.display = 'none';
+      document.getElementById('q-launch-btn').style.display = 'block';
+      radioQualif('Sur la piste — armez le tour chrono avant la ligne !', 'info');
+    }
+  } else if(QS.pitState === 'racing') {
+    QS.trackPos += delta;
+    QS.distTotal += delta;
+    if(QS.trackPos >= 1) {
+      QS.trackPos -= 1;
+
+      // Fin de tour chrono
+      if(QS.onLap) {
+        const realLap = computeQualifLapTime() * 1000 * (1 + (Math.random()-0.5)*0.005);
+        QS.lastLapMs = realLap;
+        QS.lapCount++;
+        if(!QS.bestLapMs || realLap < QS.bestLapMs) {
+          QS.bestLapMs = realLap;
+          radioQualif(`🟢 Nouveau meilleur tour ! ${formatLap(realLap)}`, 'good');
+        } else {
+          const gap = (realLap - QS.bestLapMs) / 1000;
+          radioQualif(`Tour ${QS.lapCount} : ${formatLap(realLap)} (+${gap.toFixed(3)}s)`, 'info');
+        }
+        QS.onLap = false;
+        QS.currentSector = 0;
+        document.getElementById('q-sector-disp').textContent = 'Tour terminé';
+        document.getElementById('q-launch-btn').style.display = 'block';
+        updateQualifStandings();
+      }
+
+      // Démarrage du tour chrono au passage de la ligne si armé
+      if(QS.lapArmed) {
+        QS.lapArmed = false;
+        QS.onLap = true;
+        QS.lapStartDist = QS.distTotal;
+        QS.currentSector = 0;
+        document.getElementById('q-launch-btn').style.display = 'none';
+        document.getElementById('q-sector-disp').textContent = 'Secteur 1';
+        radioQualif('🔴 Tour chrono démarré !', 'good');
+      }
+
+    } else if(QS.onLap) {
+      const sec = Math.floor(QS.trackPos * 3);
+      if(sec !== QS.currentSector) {
+        QS.currentSector = sec;
+        document.getElementById('q-sector-disp').textContent = `Secteur ${sec + 1}`;
+      }
+    }
+  }
+
+  // Avancer les IA
+  QS.aiCars.forEach(ai => {
+    const aiLapMs = ai.potential * 1000;
+    const aiDelta = (dt * 9) / aiLapMs;
+
+    if(ai.pitState === 'inPit') {
+      // Sortir des stands au moment prévu
+      if(QS.timeLeftMs <= ai.exitAt) {
+        ai.pitState = 'exiting';
+      }
+    } else if(ai.pitState === 'exiting') {
+      ai.pitLanePos += aiDelta * 2;
+      if(ai.pitLanePos >= 1) {
+        ai.pitState = 'racing';
+        ai.trackPos = getPitExitT();
+        ai.distTotal = getPitExitT();
+        ai.onLap = true;
+      }
+    } else if(ai.pitState === 'racing') {
+      ai.trackPos += aiDelta;
+      ai.distTotal += aiDelta;
+      if(ai.trackPos >= 1) {
+        ai.trackPos -= 1;
+        ai.lapCount++;
+        if(ai.onLap) {
+          const t = ai.potential * 1000 * (0.997 + Math.random() * 0.006);
+          if(!ai.bestLapMs || t < ai.bestLapMs) {
+            ai.bestLapMs = t;
+            updateQualifStandings();
+          }
+          ai.onLap = false;
+          // Second tour si assez de temps
+          if(QS.timeLeftMs > aiLapMs * 1.5) {
+            setTimeout(() => { ai.onLap = true; }, 500);
+          }
+        }
+      }
+    }
+  });
+
+  // UI
+  updateQualifClock();
+  document.getElementById('q-best').textContent = formatLap(QS.bestLapMs);
+  document.getElementById('q-last').textContent = formatLap(QS.lastLapMs);
+  document.getElementById('q-laps').textContent = QS.lapCount;
+
+  drawQualifCircuit();
+}
+
+function computeQualifLapTime() {
+  const tyre = TYRE_PROPS[QS.tyreType];
+  let base = getBaseLapTime();
+  base += tyre.lapBonus * (GAME_MODE === 'sc' ? 0.1 : 1);
+  if(QS.engineMode === 'attack') base -= (GAME_MODE === 'sc' ? 0.5 : 3);
+  return Math.max(base, getBaseLapTime() * 0.96);
+}
+
+function qExitPits() {
+  if(QS.pitState !== 'inPit') return;
+  QS.pitState = 'exiting';
+  QS.pitLanePos = 0.5;
+  document.getElementById('q-pit-out-btn').style.display = 'none';
+  radioQualif('Sortie des stands...', 'info');
+}
+
+function qLaunchLap() {
+  if(QS.onLap || QS.lapArmed) return;
+  if(QS.pitState !== 'racing') {
+    radioQualif('⚠️ Sortez des stands d\'abord !', 'alert');
+    return;
+  }
+  QS.lapArmed = true;
+  document.getElementById('q-status').textContent = '🟡 Prêt — tour chrono au prochain passage de ligne...';
+  document.getElementById('q-sector-disp').textContent = 'En attente ligne...';
+  radioQualif('Tour armé — passage de ligne pour démarrer !', 'info');
+}
+
+function selectQTyre(btn) {
+  document.querySelectorAll('#q-tyre-btns .btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  QS.tyreType = btn.dataset.tyre;
+}
+
+function selectQMode(btn) {
+  document.querySelectorAll('[data-qmode]').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  QS.engineMode = btn.dataset.qmode;
+}
+
+function updateQualifClock() {
+  const ms = Math.max(0, QS.timeLeftMs);
+  const m = Math.floor(ms / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  const el = document.getElementById('qualif-clock-display');
+  el.textContent = `${m}:${String(s).padStart(2,'0')}`;
+  el.classList.toggle('urgent', ms < 60000);
+}
+
+function updateQualifStandings() {
+  const all = [
+    { name: QS.teamName, best: QS.bestLapMs, isPlayer: true },
+    ...QS.aiCars.map(ai => ({ name: ai.name, best: ai.bestLapMs, isPlayer: false }))
+  ].filter(c => c.best !== null);
+  all.sort((a, b) => a.best - b.best);
+
+  const el = document.getElementById('qualif-standings');
+  if(!all.length) { el.innerHTML = '<div style="color:var(--text3);font-size:11px;padding:4px">Aucun temps enregistré</div>'; return; }
+
+  el.innerHTML = all.map((c, i) => {
+    const gap = i === 0 ? '<span style="color:var(--accent)">POLE</span>' : `+${((c.best - all[0].best)/1000).toFixed(3)}`;
+    return `<div class="q-row ${c.isPlayer?'player':''}">
+      <div class="q-pos ${i===0?'best':''}">${i+1}</div>
+      <div>${c.isPlayer?`<span style="color:var(--accent)">${c.name}</span>`:c.name}</div>
+      <div class="q-time">${formatLap(c.best)}</div>
+    </div>`;
+  }).join('');
+
+  // Position provisoire joueur
+  const playerIdx = all.findIndex(c => c.isPlayer);
+  if(playerIdx >= 0) document.getElementById('q-pos').textContent = `P${playerIdx+1}`;
+}
+
+let qRadioLog = [];
+function radioQualif(msg, type='info') {
+  const el = document.getElementById('q-status');
+  if(el) {
+    el.textContent = msg;
+    el.style.color = type==='good' ? 'var(--green)' : type==='alert' ? 'var(--red)' : 'var(--text2)';
+  }
+}
+
+function drawQualifCircuit() {
+  if(!qCtx) return;
+  const savedCtx = ctx, savedCw = cw, savedCh = ch, savedBg = bgCanvas;
+  ctx = qCtx; cw = qCw; ch = qCh; bgCanvas = qBgCanvas;
+
+  // Fond
+  ctx.clearRect(0, 0, cw, ch);
+  if(bgCanvas) ctx.drawImage(bgCanvas, 0, 0);
+
+  // Particules
+  updateParticles(16);
+  drawParticles();
+
+  // IA — uniquement en mode solo (pas en multi, les qualifs sont individuelles)
+  if(!MULTI.eventId) {
+    QS.aiCars.forEach((ai, i) => {
+      let px, py, angle;
+      if(ai.pitState === 'racing') {
+        const pt = getPathPoint(ai.trackPos);
+        px = pt[0]*cw; py = pt[1]*ch;
+        angle = getPathAngle(ai.trackPos);
+      } else {
+        const pt = getPitPoint(ai.pitLanePos);
+        px = pt[0]*cw; py = pt[1]*ch;
+        angle = getPitAngle(ai.pitLanePos);
+      }
+      const col = CAR_COLORS[i % CAR_COLORS.length];
+      drawGT3Car(px, py, angle, col, CAR_LIVERIES[i], false, i+2);
+      if(ai.onLap && ai.pitState === 'racing') {
+        ctx.beginPath();
+        ctx.arc(px, py, 10, 0, Math.PI*2);
+        ctx.strokeStyle = 'rgba(232,60,60,0.5)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    });
+  }
+
+  // Joueur — position selon pitState
+  {
+    let px, py, pAngle;
+    if(QS.pitState === 'racing') {
+      const pp = getPathPoint(QS.trackPos);
+      px = pp[0]*cw; py = pp[1]*ch;
+      pAngle = getPathAngle(QS.trackPos);
+    } else {
+      const pp = getPitPoint(QS.pitLanePos);
+      px = pp[0]*cw; py = pp[1]*ch;
+      pAngle = getPitAngle(QS.pitLanePos);
+      if(QS.pitState === 'inPit') {
+        ctx.fillStyle = 'rgba(60,232,120,0.15)';
+        ctx.beginPath(); ctx.arc(px, py, 18, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = 'rgba(60,232,120,0.5)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(px, py, 18, 0, Math.PI*2); ctx.stroke();
+      }
+    }
+    drawGT3Car(px, py, pAngle, '#e8a020', {stripe:'#fff',accent:'#000'}, true, 1);
+    if(QS.onLap) {
+      ctx.beginPath(); ctx.arc(px, py, 14, 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba(60,232,120,0.6)'; ctx.lineWidth = 2.5; ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.78)';
+    ctx.beginPath(); ctx.roundRect(px-26, py-32, 52, 14, [3]); ctx.fill();
+    ctx.fillStyle = QS.pitState !== 'racing' ? '#22cc66' : '#e8a020';
+    ctx.font = 'bold 9px Barlow Condensed';
+    ctx.textAlign = 'center';
+    ctx.fillText(QS.pitState === 'inPit' ? 'AUX STANDS' : QS.teamName.substring(0,10), px, py-21);
+    ctx.textAlign = 'left';
+  }
+
+  // Secteurs visuels (3 arcs colorés sur le circuit)
+  drawSectorIndicators();
+
+  ctx = savedCtx; cw = savedCw; ch = savedCh; bgCanvas = savedBg;
+}
+
+function drawSectorIndicators() {
+  const sectorColors = ['rgba(232,60,60,0.6)','rgba(232,160,32,0.6)','rgba(60,232,120,0.6)'];
+  for(let s=0; s<3; s++) {
+    const t0 = s/3, t1 = (s+1)/3;
+    const steps = 20;
+    ctx.beginPath();
+    for(let i=0; i<=steps; i++) {
+      const t = t0 + (i/steps)*(t1-t0);
+      const pt = getPathPoint(t);
+      if(i===0) ctx.moveTo(pt[0]*cw, pt[1]*ch);
+      else ctx.lineTo(pt[0]*cw, pt[1]*ch);
+    }
+    const isDone = QS.onLap && s < QS.currentSector;
+    const isActive = QS.onLap && s === QS.currentSector;
+    ctx.strokeStyle = isDone ? 'rgba(60,232,120,0.5)' : isActive ? 'rgba(232,160,32,0.7)' : 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = isDone || isActive ? 4 : 2;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+  }
+}
+
+function endQualif() {
+  QS.finished = true;
+  const playerBest = QS.bestLapMs || (getBaseLapTime() * 1.07 * 1000);
+
+  // En mode multi : publier le chrono sur Firebase
+  if(MULTI.eventId) {
+    db.ref(`events/${MULTI.eventId}/qualif_results/${MULTI.playerId}`).set({
+      teamName: QS.teamName,
+      carName: QS.car.name,
+      best: playerBest,
+      tyre: QS.tyreType,
+      publishedAt: Date.now(),
+    });
+  }
+
+  const all = [
+    {
+      name: QS.teamName,
+      teamName: QS.teamName,
+      carName: QS.car.name,
+      best: playerBest,
+      isPlayer: true,
+      tyre: QS.tyreType
+    },
+    ...QS.aiCars.map((ai, i) => ({
+      name: ai.name,
+      teamName: ai.teamName || `[IA] Team ${i+1}`,
+      carName: ai.name,
+      isPlayer: false,
+      best: ai.bestLapMs || (ai.potential * 1.03 * 1000),
+      tyre: ['S','M','H'][Math.floor(Math.random()*3)]
+    }))
+  ];
+  all.sort((a, b) => a.best - b.best);
+  QS.results = all;
+
+  document.getElementById('qualif-screen').style.display = 'none';
+
+  // En multi : attendre les chronos des autres puis afficher la grille commune
+  if(MULTI.eventId) {
+    showQualifResults();
+    listenToMultiQualifResults();
+  } else {
+    showQualifResults();
+  }
+}
+
+function showQualifResults() {
+  document.getElementById('qualif-results-screen').style.display = 'flex';
+  const pole = QS.results[0];
+
+  // Classement
+  document.getElementById('qualif-results-list').innerHTML = QS.results.map((c, i) => {
+    const posClass = i===0?'p1':i===1?'p2':i===2?'p3':'';
+    const gap = i === 0 ? '<span style="color:var(--accent);font-weight:700">POLE</span>'
+              : `+${((c.best - pole.best)/1000).toFixed(3)}s`;
+    const nameColor = c.isPlayer ? 'color:var(--accent);font-weight:600' : 'color:var(--text2)';
+    return `<div style="display:grid;grid-template-columns:36px 1fr 90px 70px;align-items:center;gap:8px 12px;
+      padding:7px 14px;margin-bottom:3px;border-radius:3px;font-size:13px;
+      background:${c.isPlayer?'rgba(232,160,32,0.08)':'var(--bg2)'};
+      border:1px solid ${c.isPlayer?'var(--accent)':'var(--border)'}">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;
+        color:${posClass==='p1'?'gold':posClass==='p2'?'silver':posClass==='p3'?'#cd7f32':'var(--text3)'};text-align:center">${i+1}</div>
+      <div>
+        <div style="${nameColor}">${c.isPlayer?'🏎️ ':''}${c.teamName || c.name}</div>
+        <div style="font-size:10px;color:var(--text3)">${c.carName || ''}</div>
+      </div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:12px;text-align:right;color:var(--text2)">${formatLap(c.best)}</div>
+      <div style="text-align:right;font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text3)">${gap}</div>
+    </div>`;
+  }).join('');
+
+  // Résumé parc fermé
+  document.getElementById('pf-summary').innerHTML = `
+    <span><span class="tyre-badge"><span class="tyre-dot tyre-${PF.tyre}"></span>${TYRE_PROPS[PF.tyre].name}</span></span>
+    <span style="color:var(--text2)">⛽ ${PF.fuel}L</span>
+    <span style="color:var(--text2)">⚙️ ${PF.engineMode === 'attack'?'Attaque':PF.engineMode === 'saving'?'Économie':'Normal'}</span>
+  `;
+}
+
+function goToGrid() {
+  document.getElementById('qualif-results-screen').style.display = 'none';
+  showGrid();
+}
+
+// ── Affichage grille animée ──
+function showGrid() {
+  document.getElementById('grid-screen').style.display = 'block';
+  const pole = QS.results[0];
+
+  const container = document.getElementById('grid-rows');
+  container.innerHTML = QS.results.map((c, i) => {
+    const gap = i === 0 ? 'POLE POSITION' : `+${((c.best - QS.results[0].best)/1000).toFixed(3)}s`;
+    const posClass = i===0?'p1':i===1?'p2':i===2?'p3':'';
+    const nameColor = c.isPlayer ? 'color:var(--accent)' : c.teamName?.startsWith('[IA]') ? 'color:var(--text2)' : '';
+    return `<div class="grid-row ${c.isPlayer?'player-row':''}" id="gridrow-${i}">
+      <div class="grid-pos ${posClass}">${i+1}</div>
+      <div>
+        <div class="grid-car" style="${nameColor}">${c.teamName || c.name}</div>
+        <div class="grid-car-sub">${c.carName || c.name} · <span class="tyre-badge"><span class="tyre-dot tyre-${c.tyre}"></span>${TYRE_PROPS[c.tyre]?.name||'Slick'}</span></div>
+      </div>
+      <div class="grid-time">${formatLap(c.best)}</div>
+      <div class="grid-gap" style="${i===0?'color:var(--accent);font-weight:700':''}"">${gap}</div>
+    </div>`;
+  }).join('');
+
+  // Animation : apparition une par une
+  let delay = 0;
+  QS.results.forEach((_, i) => {
+    setTimeout(() => {
+      const row = document.getElementById(`gridrow-${i}`);
+      if(row) row.classList.add('visible');
+    }, delay);
+    delay += i < 3 ? 350 : 120;
+  });
+
+  setTimeout(() => {
+    const btn = document.getElementById('grid-start-btn');
+    const countdown = document.getElementById('grid-countdown');
+
+    if(MULTI.eventId && !MULTI.isHost) {
+      // Non-hôte : bouton caché, message d'attente
+      btn.style.display = 'none';
+      countdown.textContent = '⏳ En attente du départ par l\'organisateur...';
+    } else {
+      // Solo ou hôte : bouton actif
+      btn.style.opacity = '1';
+      btn.style.pointerEvents = 'auto';
+      btn.style.display = 'block';
+      countdown.textContent = MULTI.eventId
+        ? '👑 Organisateur — cliquez pour lancer la course pour tous'
+        : 'Prêt — cliquez pour démarrer la course';
+    }
+  }, delay + 600);
+}
+
+// ── Compte à rebours générique ──
+function showCountdown(numId, labelId, overlayId, steps, onDone) {
+  const overlay = document.getElementById(overlayId);
+  const numEl = document.getElementById(numId);
+  const labelEl = document.getElementById(labelId);
+  overlay.style.display = 'flex';
+
+  let i = 0;
+  function tick() {
+    if(i >= steps.length) {
+      overlay.style.display = 'none';
+      onDone();
+      return;
+    }
+    const step = steps[i];
+    numEl.textContent = step.num;
+    if(labelEl && step.label !== undefined) labelEl.textContent = step.label;
+
+    // Animation de scale
+    numEl.style.transition = 'none';
+    numEl.style.transform = 'scale(1.4)';
+    numEl.style.opacity = '0';
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        numEl.style.transition = 'transform 0.7s ease, opacity 0.3s ease';
+        numEl.style.transform = 'scale(1)';
+        numEl.style.opacity = '1';
+      });
+    });
+
+    i++;
+    setTimeout(tick, step.duration || 900);
+  }
+  tick();
+}
+
+// ── Lancement de la course depuis la grille ──
+function launchRace() {
+  // Désactiver le bouton pour éviter double-clic
+  const btn = document.getElementById('grid-start-btn');
+  if(btn) { btn.style.opacity = '0.4'; btn.style.pointerEvents = 'none'; }
+  document.getElementById('grid-countdown').textContent = '...';
+  const playerPos = QS.results.findIndex(c => c.isPlayer);
+  initGameState(QS.teamName, QS.car, [QS.driver]);
+  // Initialiser le premier front météo aléatoire
+  scheduleNextWeatherFront();
+
+  // Appliquer les réglages parc fermé au départ
+  G.tyreType = PF.tyre;
+  G.tyreWear = 100;
+  G.fuel = PF.fuel;
+  G.engineMode = PF.engineMode;
+  G.plannedTyre = PF.tyre;
+  G.engineHealth = 100;
+
+  // En mode multi : remplacer les premières IA par les vrais joueurs inscrits
+  if(MULTI.eventId && MULTI.allRegisteredPlayers?.length > 0) {
+    MULTI.allRegisteredPlayers.forEach((p, i) => {
+      if(i < G.competitors.length) {
+        G.competitors[i].teamName = `👤 ${p.teamName}`;
+        G.competitors[i].isHumanSlot = true;
+        G.competitors[i].playerId = p.id; // lier le concurrent au joueur Firebase
+        // Initialiser avec des réglages par défaut
+        G.competitors[i].engineMode = 'normal';
+        G.competitors[i].driverAggro = 'normal';
+        G.competitors[i].pitState = 'racing';
+        G.competitors[i].pitLanePos = 0;
+        G.competitors[i].inPit = false;
+        G.competitors[i].boostActive = false;
+        G.competitors[i].battery = 50;
+      }
+    });
+  }
+
+  // Limiter les IA selon aiCount
+  if(MULTI.eventId && MULTI.eventData) {
+    const aiCount = MULTI.eventData.aiCount ?? 12;
+    const humanSlots = MULTI.allRegisteredPlayers?.length || 0;
+    const totalKeep = humanSlots + aiCount;
+    if(G.competitors.length > totalKeep) {
+      G.competitors = G.competitors.slice(0, totalKeep);
+    }
+  }
+
+  // Activer les listeners multijoueur
+  if(MULTI.eventId) {
+    if(MULTI.isHost) {
+      setupHostDisconnectDetection();
+      listenToRemoteDecisions();
+      // Bandeau avertissement hôte
+      const banner = document.createElement('div');
+      banner.id = 'host-banner';
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#e84040;color:#fff;text-align:center;font-size:11px;padding:4px;z-index:999;font-family:Barlow Condensed,sans-serif;letter-spacing:1px';
+      banner.textContent = '👑 ORGANISATEUR — Ne fermez pas cet onglet, vous êtes le serveur de jeu';
+      document.body.appendChild(banner);
+    } else {
+      listenForHostDisconnect();
+    }
+  }
+
+  // Assigner les lapBase de course depuis le potential qualif
+  // → même individus, même rythme en qualif et en course
+  QS.results.forEach((c, i) => {
+    if(c.isPlayer) return;
+    // Trouver l'IA qualif correspondante par nom
+    const aiQualif = QS.aiCars.find(a => a.name === c.name);
+    const raceIdx = i < playerPos ? i : i - 1; // décalage si joueur devant
+    const comp = G.competitors[i <= playerPos ? i : i - 1];
+    if(comp && aiQualif) {
+      comp.lapBase = aiQualif.potential; // même rythme qu'en qualif
+      comp.name = aiQualif.name;
+    }
+    // Position sur la grille
+    if(comp) {
+      comp.distTotal = (QS.results.length - 1 - i) * 0.002;
+      comp.trackPos = comp.distTotal % 1;
+    }
+  });
+
+  // Position joueur
+  G.distTotal = (QS.results.length - 1 - playerPos) * 0.002;
+  G.trackPos = G.distTotal % 1;
+
+  document.getElementById('game-screen').style.display = 'block';
+  document.getElementById('grid-screen').style.display = 'none';
+  document.getElementById('h-total-laps').textContent = G.totalLaps;
+  const badge = document.getElementById('track-name-badge');
+  if(badge) badge.textContent = GAME_MODE === 'sc' ? 'SUPERSPEEDWAY OVAL' : 'CIRCUIT DE VALDORIA';
+  buildDriverUI();
+  buildDriverBtns();
+
+  // setTimeout garanti que le layout est calculé avant initCanvas
+  setTimeout(() => {
+    initCanvas();
+    const slider = document.getElementById('fuel-slider');
+    if(slider) { slider.max = G.fuelCap; slider.value = G.plannedFuel; updateFuelSlider(G.plannedFuel); }
+    G.paused = true;
+
+    const posStr = playerPos === 0 ? '🏆 POLE POSITION' : `P${playerPos+1}`;
+    showCountdown('countdown-number', 'countdown-label', 'countdown-overlay', [
+      { num: '3', label: `DÉPART DEPUIS ${posStr}`, duration: 1000 },
+      { num: '2', label: `DÉPART DEPUIS ${posStr}`, duration: 1000 },
+      { num: '1', label: `DÉPART DEPUIS ${posStr}`, duration: 1000 },
+      { num: 'GO !', label: 'ALLEZ !', duration: 600 },
+    ], () => {
+      G.paused = false;
+      lastTs = performance.now();
+      radioMsg(`Feux éteints — PARTEZ ! Départ depuis ${posStr}`, 'good');
+      notify(`Départ ${posStr}`, playerPos === 0 ? 'good' : 'info');
+    });
+
+    requestAnimationFrame(gameLoop);
+    // Démarrer la synchronisation multijoueur si en mode multi
+    if(MULTI.eventId) {
+      startMultiSync();
+      stopListenToMultiQualifResults();
+    }
+  }, 100);
+}
+
+function startRace() { goToQualif(); }
+
+// ═══════════════════════════════════════════════════════════
+//  VOIE DES STANDS — chemin parallèle au circuit près de t=0
+// ═══════════════════════════════════════════════════════════
+
+// Circuit GT — coordonnées exactes calibrées visuellement
+const PIT_GT = {
+  ENTRY_T: 0.975,
+  EXIT_T:  0.205,
+  PATH: [
+    [0.196,  0.752],  // [0] entrée
+    [0.1244, 0.7086], // [1]
+    [0.0907, 0.6552], // [2]
+    [0.093,  0.35],   // [3]
+    [0.1267, 0.2759], // [4]
+    [0.1767, 0.2138], // [5]
+    [0.257,  0.1552], // [6]
+    [0.3248, 0.1688], // [7] sortie
+  ]
+};
+
+// SC OVAL — coordonnées exactes calibrées visuellement
+const PIT_SC = {
+  ENTRY_T: 0.435,
+  EXIT_T:  0.754,
+  PATH: [
+    [0.195,  0.573],  // [0] entrée
+    [0.3686, 0.6362], // [1]
+    [0.6267, 0.6828], // [2]
+    [0.7932, 0.652],  // [3] sortie
+  ]
+};
+
+// Accesseurs dynamiques
+function getPitConfig() {
+  return GAME_MODE === 'sc' ? PIT_SC : PIT_GT;
+}
+function getPitEntryT() { return getPitConfig().ENTRY_T; }
+function getPitExitT()  { return getPitConfig().EXIT_T; }
+
+// Rétrocompat (non utilisées directement — remplacées par getPitEntryT/getPitExitT)
+const PIT_ENTRY_T = 0.95;
+const PIT_EXIT_T  = 0.08;
+const PIT_LANE_PATH = PIT_GT.PATH;
+
+// Position "box" dans les stands (index dans PIT_LANE_PATH)
+const PIT_BOX_IDX = 4; // milieu du pit lane
+
+// Interpolation sur PIT_LANE_PATH (t: 0-1)
+function getPitPoint(t) {
+  t = Math.max(0, Math.min(1, t));
+  const pts = getPitConfig().PATH;
+  const n = pts.length - 1;
+  const i = Math.floor(t * n);
+  const a = pts[Math.min(i, n)];
+  const b = pts[Math.min(i+1, n)];
+  const f = (t * n) - i;
+  return [a[0]+(b[0]-a[0])*f, a[1]+(b[1]-a[1])*f];
+}
+
+function getPitAngle(t) {
+  const eps = 0.05;
+  const a = getPitPoint(Math.max(0, t-eps));
+  const b = getPitPoint(Math.min(1, t+eps));
+  return Math.atan2((b[1]-a[1])*ch, (b[0]-a[0])*cw);
+}
+
+function drawPitLane(bg) {
+  const pitPath = getPitConfig().PATH;
+
+  // Surface pit lane
+  bg.beginPath();
+  bg.moveTo(pitPath[0][0]*cw, pitPath[0][1]*ch);
+  for(let i=1; i<pitPath.length; i++) {
+    bg.lineTo(pitPath[i][0]*cw, pitPath[i][1]*ch);
+  }
+  bg.strokeStyle = '#2e3040';
+  bg.lineWidth = 11;
+  bg.lineCap = 'round'; bg.lineJoin = 'round';
+  bg.stroke();
+
+  bg.beginPath();
+  bg.moveTo(pitPath[0][0]*cw, pitPath[0][1]*ch);
+  for(let i=1; i<pitPath.length; i++) {
+    bg.lineTo(pitPath[i][0]*cw, pitPath[i][1]*ch);
+  }
+  bg.strokeStyle = '#3a3f4e';
+  bg.lineWidth = 8;
+  bg.stroke();
+
+  // Ligne jaune
+  bg.setLineDash([6, 8]);
+  bg.beginPath();
+  bg.moveTo(pitPath[0][0]*cw, pitPath[0][1]*ch);
+  for(let i=1; i<pitPath.length; i++) {
+    bg.lineTo(pitPath[i][0]*cw, pitPath[i][1]*ch);
+  }
+  bg.strokeStyle = 'rgba(232,160,32,0.5)';
+  bg.lineWidth = 1;
+  bg.stroke();
+  bg.setLineDash([]);
+
+  // Boxes
+  for(let b2=2; b2<=6; b2++) {
+    const pt = getPitPoint(b2/8);
+    const angle = getPitAngle(b2/8);
+    const perp = angle + Math.PI/2;
+    bg.fillStyle = '#1a1e28';
+    bg.strokeStyle = 'rgba(232,160,32,0.3)';
+    bg.lineWidth = 0.5;
+    bg.save();
+    bg.translate(pt[0]*cw + Math.cos(perp)*10, pt[1]*ch + Math.sin(perp)*10);
+    bg.rotate(angle);
+    bg.beginPath(); bg.roundRect(-10, -5, 20, 10, [1]);
+    bg.fill(); bg.stroke();
+    bg.restore();
+  }
+
+  // Panneau STANDS
+  const midPt = getPitPoint(0.5);
+  bg.fillStyle = '#1a1e28';
+  bg.strokeStyle = '#e8a020';
+  bg.lineWidth = 1;
+  bg.beginPath(); bg.roundRect(midPt[0]*cw - 30, midPt[1]*ch - 24, 60, 18, [3]);
+  bg.fill(); bg.stroke();
+  bg.fillStyle = '#e8a020';
+  bg.font = 'bold 8px Barlow Condensed';
+  bg.textAlign = 'center';
+  bg.fillText('PIT LANE', midPt[0]*cw, midPt[1]*ch - 11);
+  bg.textAlign = 'left';
+
+  // Flèche entrée
+  const entryPt = getPathPoint(getPitEntryT() - 0.02);
+  bg.fillStyle = 'rgba(232,160,32,0.7)';
+  bg.font = 'bold 9px Barlow Condensed';
+  bg.textAlign = 'center';
+  bg.fillText('▶ PIT', entryPt[0]*cw, entryPt[1]*ch - 12);
+  bg.textAlign = 'left';
+}
+
+const CIRCUIT_PATH = [
+  [0.18, 0.72],
+  [0.18, 0.60],[0.17, 0.48],[0.17, 0.36],
+  [0.18, 0.28],[0.22, 0.22],[0.28, 0.18],
+  [0.36, 0.16],[0.45, 0.15],[0.54, 0.15],
+  [0.62, 0.16],[0.68, 0.20],[0.70, 0.26],[0.68, 0.32],[0.63, 0.35],
+  [0.58, 0.36],[0.54, 0.40],[0.57, 0.44],[0.62, 0.46],
+  [0.68, 0.50],[0.72, 0.56],[0.72, 0.63],
+  [0.70, 0.70],[0.65, 0.76],[0.58, 0.79],
+  [0.50, 0.80],[0.44, 0.78],[0.40, 0.74],[0.36, 0.78],[0.30, 0.80],
+  [0.24, 0.78],[0.20, 0.76],[0.18, 0.72]
+];
+
+// Virages avec kerbs (t = position sur le path, angle = courbure)
+const CORNER_LABELS = [
+  { t: 0.00, label: 'Gr. Courbe' },
+  { t: 0.15, label: 'Courbe du Vent' },
+  { t: 0.30, label: 'Épingle Nord' },
+  { t: 0.45, label: 'Esse du Lac' },
+  { t: 0.62, label: 'Falaise' },
+  { t: 0.75, label: 'Chicane Sud' },
+];
+
+// Zones de virage pour les kerbs (t_start, t_end)
+const KERB_ZONES = [
+  [0.00, 0.03],[0.13, 0.18],[0.28, 0.35],
+  [0.42, 0.50],[0.60, 0.66],[0.73, 0.80]
+];
+
+const CAR_COLORS = [
+  '#2288dd','#dd2222','#22cc66','#ddcc22','#aa22dd',
+  '#22cccc','#dd7722','#dd2288','#88dd22','#2266dd',
+  '#dd4422','#44dd22','#ff6600','#0099ff','#ff0066',
+  '#00cc99','#9933ff','#ffcc00','#ff3399','#33ccff'
+];
+
+const CAR_LIVERIES = [
+  { stripe:'#ffffff', accent:'#ff4444' },
+  { stripe:'#ffff00', accent:'#000000' },
+  { stripe:'#ffffff', accent:'#00ff88' },
+  { stripe:'#ff8800', accent:'#ffffff' },
+  { stripe:'#00ffff', accent:'#ffffff' },
+  { stripe:'#ffffff', accent:'#8800ff' },
+  { stripe:'#ff0088', accent:'#ffffff' },
+  { stripe:'#ffffff', accent:'#ffcc00' },
+  { stripe:'#44ff44', accent:'#004400' },
+  { stripe:'#ffffff', accent:'#0044ff' },
+  { stripe:'#ffaa00', accent:'#220000' },
+  { stripe:'#ccffcc', accent:'#006600' },
+  { stripe:'#ffffff', accent:'#ff6600' },
+  { stripe:'#ffff88', accent:'#003366' },
+  { stripe:'#ffffff', accent:'#ff0066' },
+  { stripe:'#aaffee', accent:'#004433' },
+  { stripe:'#ddaaff', accent:'#330066' },
+  { stripe:'#ffffff', accent:'#cc9900' },
+  { stripe:'#ffccee', accent:'#660033' },
+  { stripe:'#cceeff', accent:'#003366' },
+];
+
+// Particules : fumée/poussière
+let particles = [];
+
+function addParticle(x, y, vx, vy, color, life) {
+  particles.push({ x, y, vx, vy, color, life, maxLife: life, r: 2 + Math.random()*3 });
+}
+
+function updateParticles(dtReal) {
+  particles = particles.filter(p => p.life > 0);
+  particles.forEach(p => {
+    p.x += p.vx * dtReal * 0.06;
+    p.y += p.vy * dtReal * 0.06;
+    p.vx *= 0.97;
+    p.vy *= 0.97;
+    p.life -= dtReal;
+    p.r *= 0.995;
+  });
+}
+
+let ctx, cw = 800, ch = 500;  // valeurs par défaut jusqu'à initCanvas
+let animFrameId;
+let lastTs = 0;
+let bgCanvas = null;
+
+function initCanvas() {
+  const canvas = document.getElementById('circuit-canvas');
+  const wrap = document.getElementById('circuit-wrap');
+  cw = wrap.getBoundingClientRect().width || wrap.offsetWidth || 800;
+  ch = wrap.getBoundingClientRect().height || wrap.offsetHeight || 500;
+  canvas.width = cw;
+  canvas.height = ch;
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  ctx = canvas.getContext('2d');
+  console.log(`[initCanvas] GAME_MODE=${GAME_MODE} cw=${cw} ch=${ch}`);
+  prerenderBackground();
+  console.log(`[initCanvas] bgCanvas=${bgCanvas?.width}x${bgCanvas?.height}`);
+}
+
+// Pré-rendu du fond statique (herbe + circuit + kerbs + labels)
+// Évite de le recalculer à chaque frame
+function prerenderBackground() {
+  bgCanvas = document.createElement('canvas');
+  bgCanvas.width = cw; bgCanvas.height = ch;
+  const bg = bgCanvas.getContext('2d');
+  const isSC = GAME_MODE === 'sc';
+  console.log(`[prerenderBackground] isSC=${isSC} cw=${cw} ch=${ch}`);
+
+  // ── Fond ──
+  if(isSC) {
+    // Fond asphalte sombre style NASCAR
+    const bgGrd = bg.createLinearGradient(0, 0, cw, ch);
+    bgGrd.addColorStop(0, '#1a1a1a');
+    bgGrd.addColorStop(1, '#0e0e0e');
+    bg.fillStyle = bgGrd;
+    bg.fillRect(0, 0, cw, ch);
+    // Infield vert (centre de l'ovale)
+    bg.beginPath();
+    bg.ellipse(cw*0.49, ch*0.46, cw*0.28, ch*0.28, 0, 0, Math.PI*2);
+    bg.fillStyle = '#1a2e1a';
+    bg.fill();
+  } else {
+    // Fond herbe GT
+    const grassGrd = bg.createLinearGradient(0, 0, cw, ch);
+    grassGrd.addColorStop(0, '#1c3020');
+    grassGrd.addColorStop(0.5, '#1a2a1c');
+    grassGrd.addColorStop(1, '#162818');
+    bg.fillStyle = grassGrd;
+    bg.fillRect(0, 0, cw, ch);
+    bg.strokeStyle = 'rgba(255,255,255,0.025)';
+    bg.lineWidth = 1;
+    for(let g = -ch; g < cw + ch; g += 18) {
+      bg.beginPath(); bg.moveTo(g, 0); bg.lineTo(g + ch, ch); bg.stroke();
+    }
+  }
+
+  // ── Zone autour du circuit ──
+  drawTrackLayer(bg, 38, isSC ? '#1e1e1e' : '#2e2e22');
+  drawTrackLayer(bg, 30, isSC ? '#282828' : '#26262a');
+
+  // ── Kerbs (GT seulement) ──
+  if(!isSC) {
+    KERB_ZONES.forEach(([t0, t1]) => {
+      const steps = Math.ceil((t1 - t0) * 80);
+      for(let s = 0; s < steps; s++) {
+        const t = t0 + (s / steps) * (t1 - t0);
+        const pt = getPathPointRaw(t);
+        const angle = getPathAngleRaw(t);
+        const perp = angle + Math.PI / 2;
+        const kx = pt[0]*cw + Math.cos(perp)*10;
+        const ky = pt[1]*ch + Math.sin(perp)*10;
+        bg.fillStyle = s % 2 === 0 ? '#cc2222' : '#eeeeee';
+        bg.beginPath(); bg.arc(kx, ky, 3, 0, Math.PI*2); bg.fill();
+      }
+    });
+  }
+
+  // ── Mur de béton ovale (SC seulement) ──
+  if(isSC) {
+    drawTrackLayer(bg, 28, '#cccccc'); // mur extérieur blanc
+    drawTrackLayer(bg, 24, '#3a3a3a'); // surface piste
+  }
+
+  // ── Surface piste principale (sous le pit lane) ──
+  const trackColor = isSC ? '#2a2a2a' : '#3e4450';
+  drawTrackLayer(bg, 18, trackColor);
+
+  // ── Voie des stands (par-dessus la piste) ──
+  drawPitLane(bg);
+
+  // ── Bandes de banking ovale (SC) ──
+  if(isSC) {
+    // Bandes blanches sur les virages
+    for(let b2=0; b2<4; b2++) {
+      const t = b2 * 0.25;
+      const pt = getPathPointRaw(t);
+      const angle = getPathAngleRaw(t);
+      const perp = angle + Math.PI/2;
+      bg.strokeStyle = 'rgba(255,255,255,0.2)';
+      bg.lineWidth = 2;
+      bg.beginPath();
+      bg.moveTo(pt[0]*cw + Math.cos(perp)*8, pt[1]*ch + Math.sin(perp)*8);
+      bg.lineTo(pt[0]*cw - Math.cos(perp)*8, pt[1]*ch - Math.sin(perp)*8);
+      bg.stroke();
+    }
+  }
+
+  // ── Lignes de piste ──
+  const pts2 = getActivePath();
+  bg.setLineDash([10, 14]);
+  bg.beginPath();
+  bg.moveTo(pts2[0][0]*cw, pts2[0][1]*ch);
+  for(let i=1;i<pts2.length;i++) bg.lineTo(pts2[i][0]*cw, pts2[i][1]*ch);
+  bg.strokeStyle = 'rgba(255,255,255,0.07)';
+  bg.lineWidth = 1;
+  bg.lineCap = 'round'; bg.lineJoin = 'round';
+  bg.stroke();
+  bg.setLineDash([]);
+
+  // ── Ligne départ/arrivée damier ──
+  const sfPt = getPathPoint(0.005);
+  const sfAngle = getPathAngle(0.005);
+  bg.save();
+  bg.translate(sfPt[0]*cw, sfPt[1]*ch);
+  bg.rotate(sfAngle);
+  for(let row=0; row<5; row++) {
+    for(let col=0; col<4; col++) {
+      bg.fillStyle = (row+col)%2===0 ? '#ffffff' : '#000000';
+      bg.fillRect(-9 + col*4, -8 + row*4, 4, 4);
+    }
+  }
+  bg.restore();
+
+  // ── Labels virages ──
+  const labels = isSC ? OVAL_CORNER_LABELS : CORNER_LABELS;
+  bg.font = '10px Barlow Condensed';
+  bg.textAlign = 'center';
+  labels.forEach(cl => {
+    const pt = getPathPoint(cl.t);
+    const angle = getPathAngle(cl.t);
+    const perp = angle - Math.PI/2;
+    const lx = pt[0]*cw + Math.cos(perp)*22;
+    const ly = pt[1]*ch + Math.sin(perp)*22;
+    bg.fillStyle = 'rgba(0,0,0,0.5)';
+    bg.fillRect(lx - 32, ly - 11, 64, 13);
+    bg.fillStyle = isSC ? 'rgba(255,200,50,0.7)' : 'rgba(255,255,255,0.5)';
+    bg.fillText(cl.label, lx, ly);
+  });
+  bg.textAlign = 'left';
+}
+
+function drawTrackLayer(c, width, color) {
+  const pts = getActivePath();
+  c.beginPath();
+  c.moveTo(pts[0][0]*cw, pts[0][1]*ch);
+  for(let i=1;i<pts.length;i++) c.lineTo(pts[i][0]*cw, pts[i][1]*ch);
+  if(GAME_MODE === 'sc') c.closePath(); // fermer l'ovale
+  c.strokeStyle = color;
+  c.lineWidth = width;
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  c.stroke();
+}
+
+// Helpers raw (pour prerenderBackground qui n'a pas accès à cw/ch via closure)
+function getActivePath() {
+  return GAME_MODE === 'sc' ? OVAL_PATH : CIRCUIT_PATH;
+}
+
+function getPathPointRaw(t) {
+  t = ((t % 1) + 1) % 1;
+  const pts = getActivePath(), n = pts.length - 1;
+  const i = Math.floor(t * n);
+  const a = pts[i], b = pts[(i+1) % pts.length];
+  const f = (t * n) - i;
+  return [a[0]+(b[0]-a[0])*f, a[1]+(b[1]-a[1])*f];
+}
+
+function getPathPoint(t) { return getPathPointRaw(t); }
+
+function getPathAngleRaw(t) {
+  const eps = 0.005;
+  const a = getPathPointRaw(t - eps);
+  const b = getPathPointRaw(t + eps);
+  return Math.atan2((b[1]-a[1])*ch, (b[0]-a[0])*cw);
+}
+function getPathAngle(t) { return getPathAngleRaw(t); }
+
+// ── Voiture GT3 avec livrée et effets ──
+function drawGT3Car(x, y, angle, bodyColor, livery, isPlayer, num) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle - Math.PI / 2);
+
+  const W = isPlayer ? 17 : 14;
+  const L = isPlayer ? 22 : 18;
+
+  const colMain  = bodyColor;
+  const colLight = lightenColor(bodyColor, 35);
+  const colDark  = darkenColor(bodyColor, 40);
+  const colVDark = darkenColor(bodyColor, 65);
+
+  ctx.save(); ctx.translate(2, 3); ctx.globalAlpha = 0.22;
+  ctx.beginPath(); ctx.ellipse(0, 0, W*0.52, L*0.42, 0, 0, Math.PI*2);
+  ctx.fillStyle = '#000'; ctx.fill(); ctx.globalAlpha = 1; ctx.restore();
+
+  ctx.beginPath();
+  ctx.roundRect(-W/2, -L*0.42, W, L, [4, 4, 5, 5]);
+  ctx.fillStyle = colMain; ctx.fill();
+
+  ctx.beginPath();
+  ctx.roundRect(-W/2, -L*0.42, W*0.16, L, [4, 0, 0, 5]);
+  ctx.fillStyle = colDark; ctx.globalAlpha = 0.45; ctx.fill(); ctx.globalAlpha = 1;
+
+  if(livery) {
+    ctx.beginPath();
+    ctx.roundRect(-W/2+2, -L*0.42, W-4, L*0.28, [4, 4, 0, 0]);
+    ctx.fillStyle = livery.stripe; ctx.globalAlpha = 0.32; ctx.fill(); ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.rect(-W/2, L*0.02, W, L*0.10);
+    ctx.fillStyle = livery.accent; ctx.globalAlpha = 0.52; ctx.fill(); ctx.globalAlpha = 1;
+  }
+
+  ctx.beginPath();
+  ctx.roundRect(-W/2+2, -L*0.42, W-4, L*0.20, [4, 4, 0, 0]);
+  ctx.fillStyle = colLight; ctx.fill();
+
+  const rW = W - 5, rL = L * 0.40, rY = -L * 0.08;
+  ctx.beginPath();
+  ctx.roundRect(-rW/2, rY, rW, rL, [2]);
+  ctx.fillStyle = colVDark; ctx.fill();
+
+  ctx.beginPath();
+  ctx.roundRect(-rW/2, -L*0.16, rW, L*0.10, [1, 1, 0, 0]);
+  ctx.fillStyle = 'rgba(40,80,160,0.82)'; ctx.fill();
+  ctx.beginPath();
+  ctx.roundRect(-rW/2+2, -L*0.15, rW*0.32, L*0.05, [1]);
+  ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fill();
+
+  ctx.beginPath();
+  ctx.roundRect(-rW/2, rY + rL, rW, L*0.07, [0, 0, 2, 2]);
+  ctx.fillStyle = 'rgba(40,80,160,0.60)'; ctx.fill();
+
+  ctx.beginPath();
+  ctx.roundRect(-W/2-2, -L*0.46, W+4, 3, [1]);
+  ctx.fillStyle = '#111'; ctx.fill();
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(-W/2-2, -L*0.44, 4, 3);
+  ctx.fillRect(W/2-2, -L*0.44, 4, 3);
+
+  ctx.beginPath();
+  ctx.roundRect(-W/2-1, L*0.50, W+2, 2.5, [1]);
+  ctx.fillStyle = colDark; ctx.fill();
+  ctx.fillStyle = colVDark;
+  ctx.fillRect(-W/2+4, L*0.47, 2, 4);
+  ctx.fillRect(W/2-6, L*0.47, 2, 4);
+  ctx.beginPath();
+  ctx.roundRect(-W/2, L*0.52, W, 4, [0, 0, 3, 3]);
+  ctx.fillStyle = '#0a0a0a'; ctx.fill();
+
+  const wr = isPlayer ? 4.2 : 3.4;
+  [[-W/2-0.5, -L*0.25],[W/2-2.5, -L*0.25],
+   [-W/2-0.5,  L*0.36],[ W/2-2.5, L*0.36]].forEach(([wx, wy]) => {
+    ctx.beginPath(); ctx.ellipse(wx+wr/2, wy, wr*1.15, wr, 0, 0, Math.PI*2);
+    ctx.fillStyle = '#111'; ctx.fill();
+    ctx.beginPath(); ctx.ellipse(wx+wr/2, wy, wr*0.88, wr*0.78, 0, 0, Math.PI*2);
+    ctx.fillStyle = '#222'; ctx.fill();
+    ctx.beginPath(); ctx.ellipse(wx+wr/2, wy, wr*0.56, wr*0.50, 0, 0, Math.PI*2);
+    ctx.fillStyle = isPlayer ? '#c09020' : '#666'; ctx.fill();
+    ctx.beginPath(); ctx.arc(wx+wr/2, wy, wr*0.18, 0, Math.PI*2);
+    ctx.fillStyle = '#111'; ctx.fill();
+  });
+
+  ctx.fillStyle = 'rgba(0,0,0,0.65)';
+  ctx.beginPath(); ctx.roundRect(-6, rY + rL*0.28, 12, 10, [1]); ctx.fill();
+  ctx.fillStyle = isPlayer ? '#e8a020' : '#fff';
+  ctx.font = `bold ${isPlayer ? 7 : 6}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.fillText(String(num).padStart(2,'0'), 0, rY + rL*0.28 + 8);
+  ctx.textAlign = 'left';
+
+  ctx.beginPath();
+  ctx.roundRect(-W/2, -L*0.42, W, L, [4, 4, 5, 5]);
+  ctx.strokeStyle = isPlayer ? 'rgba(255,200,50,0.7)' : 'rgba(255,255,255,0.10)';
+  ctx.lineWidth = isPlayer ? 1.5 : 0.5;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// ── Particules fumée/spray pluie ──
+function spawnCarParticles(x, y, angle, isPlayer) {
+  if(Math.random() > 0.25) return;
+  const speed = 0.4 + Math.random() * 0.8;
+  const spread = (Math.random() - 0.5) * 1.4;
+  const backAngle = angle + Math.PI + spread;
+  // Couleur fixe stockée dans la particule, pas recalculée au dessin
+  let r, g, b, a;
+  if(G.weather === 'rain') {
+    r=120; g=160; b=220; a=0.28 + Math.random()*0.2;
+  } else if(isPlayer) {
+    r=220; g=180; b=50; a=0.2 + Math.random()*0.2;
+  } else {
+    r=160; g=160; b=160; a=0.12 + Math.random()*0.15;
+  }
+  addParticle(x, y, Math.cos(backAngle)*speed, Math.sin(backAngle)*speed,
+    {r, g, b, baseA: a}, 350 + Math.random()*250);
+}
+
+function drawParticles() {
+  particles.forEach(p => {
+    const alpha = (p.life / p.maxLife) * p.color.baseA;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, Math.max(0.5, p.r * (p.life/p.maxLife)), 0, Math.PI*2);
+    ctx.fillStyle = `rgba(${p.color.r},${p.color.g},${p.color.b},${alpha.toFixed(3)})`;
+    ctx.fill();
+  });
+}
+
+function lightenColor(hex, amt) {
+  if(!hex || typeof hex !== 'string') return '#888888';
+  const r = Math.min(255, parseInt(hex.slice(1,3),16)+amt);
+  const g = Math.min(255, parseInt(hex.slice(3,5),16)+amt);
+  const b = Math.min(255, parseInt(hex.slice(5,7),16)+amt);
+  return `rgb(${r},${g},${b})`;
+}
+function darkenColor(hex, amt) {
+  if(!hex || typeof hex !== 'string') return '#333333';
+  const r = Math.max(0, parseInt(hex.slice(1,3),16)-amt);
+  const g = Math.max(0, parseInt(hex.slice(3,5),16)-amt);
+  const b = Math.max(0, parseInt(hex.slice(5,7),16)-amt);
+  return `rgb(${r},${g},${b})`;
+}
+
+function drawCircuit(dtReal) {
+  if(!ctx) return;
+
+  // Fond pré-rendu (statique)
+  ctx.clearRect(0, 0, cw, ch);
+  if(bgCanvas) {
+    ctx.drawImage(bgCanvas, 0, 0);
+  } else {
+    ctx.fillStyle = '#1a2a1a';
+    ctx.fillRect(0, 0, cw, ch);
+  }
+
+  // Overlay pluie dynamique
+  if(G.weather === 'rain' || G.weather === 'light_rain') {
+    const intensity = G.weather === 'rain' ? 120 : 50;
+    const alpha = G.weather === 'rain' ? 0.45 : 0.22;
+
+    // Gouttes de pluie diagonales
+    ctx.strokeStyle = `rgba(160,200,255,${alpha})`;
+    ctx.lineWidth = G.weather === 'rain' ? 1.5 : 0.8;
+    for(let r=0; r<intensity; r++) {
+      const rx = Math.random()*cw, ry = Math.random()*ch;
+      ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx+3, ry+10); ctx.stroke();
+    }
+
+    // Piste mouillée — teinte bleue bien visible
+    const pts = getActivePath();
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0]*cw, pts[0][1]*ch);
+    for(let i=1; i<pts.length; i++) ctx.lineTo(pts[i][0]*cw, pts[i][1]*ch);
+    ctx.strokeStyle = G.weather === 'rain'
+      ? 'rgba(80,120,200,0.30)'
+      : 'rgba(100,140,200,0.15)';
+    ctx.lineWidth = 18;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    // Reflets sur la piste mouillée
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0]*cw, pts[0][1]*ch);
+    for(let i=1; i<pts.length; i++) ctx.lineTo(pts[i][0]*cw, pts[i][1]*ch);
+    ctx.strokeStyle = G.weather === 'rain'
+      ? 'rgba(180,220,255,0.12)'
+      : 'rgba(180,220,255,0.06)';
+    ctx.lineWidth = 6;
+    ctx.stroke();
+  }
+
+  // Mise à jour + dessin particules
+  updateParticles(dtReal || 16);
+  drawParticles();
+
+  // ── Tri des voitures par Y (profondeur isométrique) ──
+  const allCars = [];
+
+  G.competitors.filter(c=>!c.retired).forEach((c, i) => {
+    if(!c.trackPos && c.trackPos !== 0) return; // skip si pas initialisé
+    const color = CAR_COLORS[i % CAR_COLORS.length] || '#888888';
+    const livery = CAR_LIVERIES[i % CAR_LIVERIES.length] || {stripe:'#fff',accent:'#000'};
+    const pt = getPathPoint(c.trackPos);
+    allCars.push({
+      x: pt[0]*cw, y: pt[1]*ch, t: c.trackPos,
+      color, livery,
+      isPlayer: false, isHuman: false,
+      num: i+2
+    });
+  });
+
+  // ── Joueurs humains multijoueur ──
+  if(MULTI.eventId && MULTI.otherPlayers) {
+    const humanColors = ['#00aaff','#ff4400','#00ffaa','#ff00aa','#ffaa00','#aa00ff'];
+    MULTI.otherPlayers.forEach((p, i) => {
+      if(!p || p.trackPos === undefined) return;
+      const pt = getPathPoint(p.trackPos);
+      allCars.push({
+        x: pt[0]*cw, y: pt[1]*ch,
+        t: p.trackPos,
+        color: humanColors[i % humanColors.length],
+        livery: { stripe:'#ffffff', accent:'#000000' },
+        isPlayer: false, isHuman: true,
+        humanName: (p.teamName || 'Joueur').substring(0, 10),
+        num: 100 + i,
+      });
+    });
+  }
+
+  // Trier par Y croissant
+  allCars.sort((a, b) => a.y - b.y);
+
+  allCars.forEach(car => {
+    const angle = getPathAngle(car.t);
+    spawnCarParticles(car.x, car.y, angle, car.isPlayer);
+    drawGT3Car(car.x, car.y, angle, car.color, car.livery, car.isPlayer, car.num);
+    // Label pour les joueurs humains
+    if(car.isHuman) {
+      ctx.fillStyle = 'rgba(0,0,0,0.85)';
+      ctx.beginPath(); ctx.roundRect(car.x-28, car.y-32, 56, 14, [3]); ctx.fill();
+      ctx.fillStyle = car.color;
+      ctx.font = 'bold 9px Barlow Condensed';
+      ctx.textAlign = 'center';
+      ctx.fillText('👤 ' + car.humanName, car.x, car.y-21);
+      ctx.textAlign = 'left';
+    }
+  });
+
+  // Voiture joueur — position selon pitState
+  {
+    let px, py, pAngle;
+    if(G.pitState === 'racing') {
+      const pp = getPathPoint(G.trackPos);
+      px = pp[0]*cw; py = pp[1]*ch;
+      pAngle = getPathAngle(G.trackPos);
+    } else {
+      const pp = getPitPoint(G.pitLanePos);
+      px = pp[0]*cw; py = pp[1]*ch;
+      pAngle = getPitAngle(G.pitLanePos);
+      // Indicateur "EN STAND" si inPit
+      if(G.pitState === 'inPit') {
+        ctx.fillStyle = 'rgba(232,160,32,0.15)';
+        ctx.beginPath(); ctx.arc(px, py, 18, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = 'rgba(232,160,32,0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(px, py, 18, 0, Math.PI*2); ctx.stroke();
+      }
+    }
+    spawnCarParticles(px, py, pAngle, true);
+    drawGT3Car(px, py, pAngle, '#e8a020', {stripe:'#fff',accent:'#000'}, true, 1);
+    // Label équipe
+    ctx.fillStyle = 'rgba(0,0,0,0.78)';
+    ctx.beginPath(); ctx.roundRect(px-26, py-32, 52, 14, [3]); ctx.fill();
+    ctx.fillStyle = G.pitState !== 'racing' ? '#e8c020' : '#e8a020';
+    ctx.font = 'bold 9px Barlow Condensed';
+    ctx.textAlign = 'center';
+    ctx.fillText(G.pitState !== 'racing' ? 'AUX STANDS' : G.teamName.substring(0,10), px, py-21);
+    ctx.textAlign = 'left';
+  }
+
+  // Safety car overlay
+  if(G.safetyCar) {
+    ctx.fillStyle = 'rgba(240,180,0,0.12)';
+    ctx.fillRect(0, 0, cw, ch);
+  }
+
+  document.getElementById('sky-overlay').style.background = '';
+}
+
+// ═══════════════════════════════════════════════════════════
+//  GAME LOOP
+// ═══════════════════════════════════════════════════════════
+function gameLoop(ts) {
+  if(G.finished) return;
+  animFrameId = requestAnimationFrame(gameLoop);
+
+  const dt = Math.min(ts - lastTs, 100);
+  lastTs = ts;
+
+  if(!G.paused) {
+    G.raceTimeMs += dt * 9;
+
+    // Ma voiture — toujours calculée localement pour le ressenti immédiat
+    advancePlayerCar(dt, G);
+    tickBoost(dt);
+
+    if(!MULTI.eventId) {
+      // ══ MODE SOLO : simule les IA et la météo ══
+      advanceAICars(dt);
+      weatherTick(dt);
+    } else {
+      // ══ MODE MULTI : Cloud Function gère tout ══
+      // On publie juste nos décisions toutes les 300ms
+      publishPlayerDecisions();
+    }
+
+    updateTelemetry();
+    updateClock();
+    updateStandings();
+    updateWeatherUI();
+    updateDriverStaminaUI();
+    document.getElementById('h-pos').textContent = getPlayerPos();
+    document.getElementById('h-lap').textContent = `${G.lap}`;
+    document.getElementById('h-stops').textContent = G.pitStopCount;
+    document.getElementById('strat-pilote-actif').textContent =
+      `Pilote actuel : ${G.drivers[G.currentDriverIdx].name}`;
+  }
+
+  drawCircuit(dt);
+  if(G.lap >= G.totalLaps) endRace();
+}
+
+// ── Avancer la voiture joueur ──
+function advancePlayerCar(dt, state) {
+  const lapSpeedMs = computeLapTime() * 1000;
+  const playerDelta = (dt * 9) / lapSpeedMs;
+
+  if(state.pitState === 'racing') {
+    state.trackPos += playerDelta;
+    state.distTotal += playerDelta;
+    if(state.trackPos >= 1) { state.trackPos -= 1; completeLap(); }
+    if(state.inPit && state.trackPos >= getPitEntryT()) {
+      state.pitState = 'entering';
+      state.pitLanePos = 0;
+    }
+  } else if(state.pitState === 'entering') {
+    state.pitLanePos += playerDelta * 2;
+    if(state.pitLanePos >= 0.5) { state.pitState = 'inPit'; state.pitLanePos = 0.5; }
+  } else if(state.pitState === 'inPit') {
+    // immobile
+  } else if(state.pitState === 'exiting') {
+    state.pitLanePos += playerDelta * 2;
+    if(state.pitLanePos >= 1) {
+      state.pitState = 'racing';
+      state.trackPos = getPitExitT();
+      state.inPit = false;
+    }
+  }
+}
+
+// ── Boost décompte ──
+function tickBoost(dt) {
+  if(G.boostActive) {
+    G.boostTimeLeft -= dt;
+    if(G.boostTimeLeft <= 0) {
+      G.boostActive = false;
+      G.boostTimeLeft = 0;
+      const bb = document.getElementById('boost-btn');
+      if(bb) { bb.style.background = ''; bb.style.color = 'var(--cyan)'; }
+      const bs = document.getElementById('boost-status');
+      if(bs) bs.textContent = 'Recharge +0.5%/tour';
+      radioMsg('Boost terminé', 'info');
+    }
+  }
+}
+
+// ── Avancer les IA ──
+function advanceAICars(dt) {
+  G.competitors.forEach(c => {
+    if(c.retired) return;
+    let weatherMult = 1;
+    if(G.weather === 'rain') {
+      const onSlick = c.tyreType === 'S' || c.tyreType === 'M' || c.tyreType === 'H';
+      weatherMult = onSlick ? 1.18 : 1.04;
+    } else if(G.weather === 'light_rain') {
+      const onSlick = c.tyreType === 'S' || c.tyreType === 'M' || c.tyreType === 'H';
+      weatherMult = onSlick ? 1.08 : 1.01;
+    }
+    const aiLap = c.lapBase * (0.97 + Math.random()*0.06) * weatherMult;
+    const aiDelta = (dt * 9) / (aiLap * 1000);
+    c.trackPos += aiDelta;
+    c.distTotal += aiDelta;
+    if(c.trackPos >= 1) {
+      c.trackPos -= 1;
+      c.lap++;
+      c.totalTimeMs += aiLap * 1000;
+      c.fuel -= (100/c.pitPlan);
+      c.tyreWear -= (100/c.pitPlan) * 0.9;
+      if(c.fuel < 15 || c.tyreWear < 15) {
+        c.fuel = c.fuelCap * 0.8;
+        c.tyreWear = 85 + Math.random()*15;
+        c.pitCount++;
+        c.totalTimeMs += 35000;
+        c.pitPlan = 12 + Math.floor(Math.random()*10);
+        c.distTotal -= aiDelta;
+      }
+      if(Math.random() < 0.0003) { c.retired = true; c.retiredReason = 'Abandon mécanique'; }
+      c.battery = Math.min(100, (c.battery || 50) + 0.5);
+      if(c.battery > 60 && Math.random() < 0.05) c.battery = Math.max(0, c.battery - 20);
+    }
+  });
+}
+
+
+function computeLapTime() {
+  const tyre = TYRE_PROPS[G.tyreType];
+  let base = getBaseLapTime();
+  base += tyre.lapBonus * (GAME_MODE === 'sc' ? 0.1 : 1);
+  base += (100 - G.tyreWear) * (GAME_MODE === 'sc' ? 0.008 : 0.06);
+  base += (G.fuel / G.fuelCap) * (GAME_MODE === 'sc' ? 0.5 : 3);
+  // Mode moteur
+  if(G.engineMode === 'attack') base -= (GAME_MODE === 'sc' ? 0.5 : 3);
+  if(G.engineMode === 'saving') base += (GAME_MODE === 'sc' ? 0.8 : 5);
+  // Agressivité pilote
+  if(G.driverAggro === 'push') base -= (GAME_MODE === 'sc' ? 0.3 : 4);
+  if(G.driverAggro === 'soft') base += (GAME_MODE === 'sc' ? 0.3 : 3);
+  // Boost hybride actif — +1% vitesse
+  if(G.boostActive) base *= 0.99;
+  // Moteur endommagé
+  if(G.engineHealth < 70) base += (70 - G.engineHealth) * (GAME_MODE === 'sc' ? 0.01 : 0.08);
+  if(G.weather === 'rain') base += tyre.wetPenalty * 0.5;
+  if(G.safetyCar) base = Math.max(base, GAME_MODE === 'sc' ? 50 : 180);
+  return Math.max(base, getBaseLapTime() * 0.96);
+}
+
+function completeLap() {
+  G.lap++;
+  // Calculer le temps au tour AVANT de consommer les ressources
+  // + variation aléatoire ±0.3% (aucun tour n'est identique en vrai course)
+  const variation = 1 + (Math.random() - 0.5) * 0.006;
+  const lapTime = computeLapTime() * 1000 * variation;
+  G.lastLapMs = lapTime;
+  if(!G.bestLapMs || lapTime < G.bestLapMs) G.bestLapMs = lapTime;
+
+  // Fuel consumption
+  const fuelPerLap = (100 / 28) * (G.engineMode==='attack'?1.15:G.engineMode==='saving'?0.85:1);
+  G.fuel = Math.max(0, G.fuel - fuelPerLap);
+
+  // Tyre wear - agressivité pilote influence l'usure
+  const tyre = TYRE_PROPS[G.tyreType];
+  const aggroMult = G.driverAggro === 'push' ? 1.4 : G.driverAggro === 'soft' ? 0.7 : 1;
+  let wear = tyre.degradPerLap * (G.engineMode==='attack'?1.3:1) * aggroMult;
+  if(G.weather==='rain' && (G.tyreType==='S'||G.tyreType==='M'||G.tyreType==='H')) wear *= 1.6;
+  G.tyreWear = Math.max(0, G.tyreWear - wear);
+
+  // Batterie hybride — recharge par tour (stable et prévisible)
+  // Économie : +1%/tour | Normal : +0.5%/tour | Attaque : 0%/tour
+  if(!G.boostActive) {
+    const recharge = G.engineMode === 'saving' ? 1.0 : G.engineMode === 'attack' ? 0 : 0.5;
+    G.battery = Math.min(100, G.battery + recharge);
+  }
+
+  // Driver stamina
+  G.driverStamina[0] = Math.max(0,
+    G.driverStamina[0] - 0.3 * (1/(G.drivers[0].stamina/100)));
+
+  // ── Usure moteur ──
+  // Économie : récupère 0.5%/tour | Normal : use 1.2%/tour | Attaque : use 3.5%/tour
+  const engineWear = G.engineMode === 'saving' ? -0.5
+                   : G.engineMode === 'attack' ?  3.5
+                   :                               1.2;
+  G.engineHealth = Math.max(0, Math.min(100, G.engineHealth - engineWear));
+
+  // Alertes moteur
+  if(G.engineHealth <= 30 && G.engineHealth > 20) {
+    radioMsg('⚠️ Moteur en mauvais état ! Passez en mode Économie !', 'alert');
+  } else if(G.engineHealth <= 20 && G.engineHealth > 10) {
+    radioMsg('🔴 Moteur critique ! Réduisez immédiatement !', 'alert');
+    notify('Moteur critique — risque d\'abandon !', 'alert');
+  } else if(G.engineHealth <= 10) {
+    // Risque d'abandon croissant
+    if(Math.random() < 0.25) {
+      G.finished = true;
+      radioMsg('💥 Moteur HS — Abandon !', 'alert');
+      notify('Abandon — moteur détruit !', 'alert');
+      endRace();
+      return;
+    }
+  }
+
+  // Reliability event
+  if(Math.random() < 0.002) {
+    G.engineHealth = Math.max(0, G.engineHealth - 15);
+    if(G.engineHealth < 20) {
+      radioMsg('🔴 Problème moteur sérieux ! Arrêtez aux stands !', 'alert');
+    }
+  }
+
+  // ── Système d'accidents — basé sur les décisions risquées ──
+  // Probabilité de base très faible, multipliée par les facteurs de risque
+  const BASE_ACCIDENT_RISK = 0.003;
+  let riskMult = 1;
+  if(G.tyreWear < 15)   riskMult *= 3;
+  if(G.tyreWear < 30)   riskMult *= 1.5;
+  if(G.engineMode === 'attack')  riskMult *= 1.5;
+  if(G.driverAggro === 'push')   riskMult *= 1.5;
+  if(G.weather !== 'dry' && (G.tyreType==='S'||G.tyreType==='M'||G.tyreType==='H')) riskMult *= 5;
+  if(G.engineHealth < 10) riskMult *= 2;
+
+  // Gestion Safety Car en cours
+  if(G.safetyCar) {
+    G.safetyCarLapsLeft--;
+    if(G.safetyCarLapsLeft <= 0) {
+      G.safetyCar = false;
+      document.getElementById('sc-badge').style.display = 'none';
+      radioMsg('✅ Safety Car rentrée. Piste libre !', 'info');
+    }
+  } else if(Math.random() < BASE_ACCIDENT_RISK * riskMult) {
+    // Déterminer la gravité
+    const severity = Math.random();
+    let msg, laps, scMsg;
+    if(severity < 0.5) {
+      msg = '💨 Tête-à-queue ! Tu perds du temps mais continues.';
+      scMsg = '🟡 Safety Car — incident en piste (mineur)';
+      laps = 2 + Math.floor(Math.random()*2);
+    } else if(severity < 0.85) {
+      msg = '💥 Sortie de piste ! Dégâts sur la voiture.';
+      scMsg = '🟡 Safety Car — accident en piste';
+      laps = 3 + Math.floor(Math.random()*3);
+      G.engineHealth = Math.max(0, G.engineHealth - 20);
+      G.tyreWear = Math.max(0, G.tyreWear - 30);
+    } else {
+      msg = '🔴 Crash violent — Abandon !';
+      scMsg = '🟡 Safety Car — crash grave en piste';
+      laps = 4 + Math.floor(Math.random()*3);
+      G.finished = true;
+    }
+    G.safetyCar = true;
+    G.safetyCarLapsLeft = laps;
+    document.getElementById('sc-badge').style.display = 'inline-block';
+    radioMsg(msg, 'alert');
+    notify(msg, 'alert');
+    radioMsg(scMsg, 'info');
+    if(!G.finished) notify('Safety Car — fenêtre de pit stop !', 'info');
+  } else {
+    // Vérifier aussi si une IA a eu un accident (probabilité fixe)
+    const aiAccident = G.competitors.find(c =>
+      !c.retired && !G.safetyCar && Math.random() < 0.002
+    );
+    if(aiAccident) {
+      G.safetyCar = true;
+      G.safetyCarLapsLeft = 2 + Math.floor(Math.random()*3);
+      document.getElementById('sc-badge').style.display = 'inline-block';
+      radioMsg(`🟡 Safety Car — incident impliquant ${aiAccident.name}`, 'info');
+      notify('Safety Car — profites-en pour pitter ?', 'info');
+    }
+  }
+
+  // Low fuel warning
+  if(G.fuel < 15) { radioMsg(`⛽ Carburant critique ! ${Math.round(G.fuel)}L restants`, 'alert'); }
+  if(G.tyreWear < 15) { radioMsg(`🛞 Pneus très usés ! Arrêt urgent !`, 'alert'); }
+
+  // Automatic pit if fuel/tyre = 0
+  if(G.fuel <= 1 || G.tyreWear <= 1) {
+    radioMsg('🛑 Arrêt forcé aux stands !', 'alert');
+    executePit(G.plannedTyre, G.plannedFuel, false);
+  }
+
+  // Enregistrement dans l'historique
+  G.lapHistory.push({
+    lap: G.lap,
+    timeMs: lapTime,
+    tyre: G.tyreType,
+    sc: G.safetyCar,
+    pit: false
+  });
+  updateLapHistory();
+
+  // Update displays
+  document.getElementById('best-lap-disp').textContent = formatLap(G.bestLapMs);
+  document.getElementById('last-lap-disp').textContent = formatLap(G.lastLapMs);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PIT STOP
+// ═══════════════════════════════════════════════════════════
+let pitPlan = { tyre:'S', fuel:50, changeDriver:false, newDriverIdx:0 };
+
+function callPitStop() {
+  const modal = document.getElementById('pit-modal');
+  const tyre = TYRE_PROPS[G.plannedTyre];
+
+  document.getElementById('modal-tyre-display').innerHTML =
+    `<span class="tyre-badge"><span class="tyre-dot tyre-${G.plannedTyre}"></span>${tyre.name}</span>`;
+  document.getElementById('modal-fuel-display').textContent = `+${G.plannedFuel}L (→ ${Math.min(G.fuelCap, G.fuel+G.plannedFuel).toFixed(0)}L)`;
+
+  const nextDriver = G.plannedDriverChange
+    ? G.drivers[1-G.currentDriverIdx].name
+    : G.drivers[G.currentDriverIdx].name + ' (aucun changement)';
+  document.getElementById('modal-driver-display').textContent = nextDriver;
+
+  const tyreTime = 20;
+  const fuelTime = (G.plannedFuel / 120) * 15;
+  const driverTime = G.plannedDriverChange ? 8 : 0;
+  const total = Math.round(tyreTime + fuelTime + driverTime);
+  document.getElementById('modal-duration-display').textContent = `~${total}s fictives (~${Math.round(total/9)}s réelles)`;
+
+  const warn = document.getElementById('modal-warning');
+  if(G.weather==='rain' && (G.plannedTyre==='S'||G.plannedTyre==='M'||G.plannedTyre==='H')) {
+    warn.style.display='block';
+    warn.textContent='⚠️ Pneus slick par temps de pluie — très dangereux !';
+  } else if(G.weather==='dry' && G.plannedTyre==='W') {
+    warn.style.display='block';
+    warn.textContent='⚠️ Pneus pluie par temps sec — énorme pénalité de temps !';
+  } else { warn.style.display='none'; }
+
+  modal.classList.add('open');
+}
+
+function closePitModal() {
+  document.getElementById('pit-modal').classList.remove('open');
+}
+
+function confirmPit() {
+  closePitModal();
+  executePit(G.plannedTyre, G.plannedFuel, G.plannedDriverChange);
+}
+
+function executePit(tyre, fuel, changeDriver) {
+  G.inPit = true;
+  G.pitState = 'racing';
+
+  // Durée fictive cible : 30-50% d'un tour (~40-65s fictives)
+  // Pneus seuls : ~20s fictives
+  // Carburant : ~15s fictives pour un plein
+  // Total typique : ~35-50s fictives
+  // Le setTimeout est en ms réelles → diviser par 9 (multiplicateur)
+  const tyreTime = 20;                        // secondes fictives
+  const fuelTime = (fuel / 120) * 15;        // 0 à 15s fictives selon quantité
+  const driverTime = changeDriver ? 8 : 0;   // secondes fictives
+  const totalFictive = tyreTime + fuelTime + driverTime; // en secondes fictives
+  const totalReal = (totalFictive / 9) * 1000; // en ms réelles pour setTimeout
+
+  G.totalPitTime += totalFictive;
+  G.pitStopCount++;
+  document.getElementById('h-stops').textContent = G.pitStopCount;
+
+  // Marquer le tour dans l'historique
+  if(G.lapHistory.length > 0) {
+    G.lapHistory[G.lapHistory.length - 1].pit = true;
+    updateLapHistory();
+  }
+
+  // Appliquer les changements quand la voiture est dans la box
+  const applyPit = () => {
+    G.tyreType = tyre;
+    G.tyreWear = 98;
+    G.fuel = Math.min(G.fuelCap, G.fuel + fuel);
+    if(changeDriver) G.currentDriverIdx = 1 - G.currentDriverIdx;
+    G.engineHealth = Math.min(100, G.engineHealth + 20);
+    G.pitState = 'inPit';
+
+    setTimeout(() => {
+      G.pitState = 'exiting';
+      G.pitLanePos = 0.5;
+      radioMsg('✅ Sortie des stands !', 'good');
+    }, totalReal);
+  };
+
+  // Attendre que la voiture soit dans la box (entering → inPit)
+  const waitForBox = setInterval(() => {
+    if(G.pitState === 'inPit' || G.pitLanePos >= 0.49) {
+      clearInterval(waitForBox);
+      applyPit();
+    }
+  }, 100);
+
+  const msg = `Arrêt L${G.lap} — ${TYRE_PROPS[tyre].name}, +${Math.round(fuel)}L`;
+  radioMsg('🛞 Entrée dans la pit lane...', 'info');
+  notify(msg, 'good');
+
+  const entry = { lap: G.lap, tyre, fuel: Math.round(fuel), driver: changeDriver ? G.drivers[G.currentDriverIdx].name : null, duration: Math.round(totalFictive) };
+  G.pitHistory.push(entry);
+  updatePitHistory();
+  document.getElementById('stop-count-label').textContent = `${G.pitStopCount} arrêt${G.pitStopCount>1?'s':''}`;
+}
+
+function updateLapHistory() {
+  const el = document.getElementById('lap-history');
+  const label = document.getElementById('lap-count-label');
+  if(!el || !G.lapHistory) return;
+  if(label) label.textContent = `T${G.lap} / ${G.totalLaps}`;
+
+  // Meilleur temps pour mettre en évidence
+  const best = G.bestLapMs;
+
+  el.innerHTML = [...G.lapHistory].reverse().map(entry => {
+    const isBest = entry.timeMs === best;
+    const isFirst = entry.lap === 1;
+
+    // Écart avec le meilleur tour
+    let gapStr = '';
+    if(isBest) {
+      gapStr = `<span style="color:var(--accent);font-weight:700">BEST</span>`;
+    } else if(best) {
+      const diff = entry.timeMs - best;
+      gapStr = `<span style="color:var(--text3)">+${(diff/1000).toFixed(3)}</span>`;
+    }
+
+    // Couleur de ligne
+    let rowStyle = 'padding:2px 4px;border-radius:2px;display:grid;grid-template-columns:22px 60px 60px 40px;gap:2px 6px;align-items:center;font-size:11px;';
+    if(isBest) rowStyle += 'background:rgba(232,160,32,0.12);';
+    else if(entry.sc) rowStyle += 'background:rgba(240,180,0,0.07);';
+    else if(entry.pit) rowStyle += 'background:rgba(60,168,232,0.07);';
+
+    const lapColor = isBest ? 'color:var(--accent);font-weight:700' : 'color:var(--text)';
+    const scTag = entry.sc ? ' <span style="color:#e8c020;font-size:9px">SC</span>' : '';
+    const pitTag = entry.pit ? ' <span style="color:var(--cyan);font-size:9px">PIT</span>' : '';
+
+    return `<div style="${rowStyle}">
+      <span style="color:var(--text3);font-family:'Share Tech Mono',monospace">${entry.lap}</span>
+      <span style="${lapColor};font-family:'Share Tech Mono',monospace">${formatLap(entry.timeMs)}${scTag}${pitTag}</span>
+      <span style="font-family:'Share Tech Mono',monospace">${gapStr}</span>
+      <span><span class="tyre-badge"><span class="tyre-dot tyre-${entry.tyre}"></span></span></span>
+    </div>`;
+  }).join('');
+}
+
+function updatePitHistory() {
+  const el = document.getElementById('pit-history');
+  if(G.pitHistory.length===0) return;
+  el.innerHTML = G.pitHistory.map(p=>`
+    <div style="padding:4px 0; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+      <span>Tour ${p.lap}</span>
+      <span class="tyre-badge"><span class="tyre-dot tyre-${p.tyre}"></span>${TYRE_PROPS[p.tyre].name}</span>
+      <span>+${p.fuel}L</span>
+      <span style="color:var(--text3)">${p.duration}s</span>
+      ${p.driver?`<span style="color:var(--cyan);font-size:10px">${p.driver}</span>`:''}
+    </div>
+  `).reverse().join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  STRATEGY UI
+// ═══════════════════════════════════════════════════════════
+function selectTyre(btn) {
+  document.querySelectorAll('#tyre-btns .btn').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+  G.plannedTyre = btn.dataset.tyre;
+}
+
+function updateFuelSlider(val) {
+  val = parseInt(val);
+  G.plannedFuel = val;
+  document.getElementById('fuel-slider-val').textContent = val + 'L';
+  const fuelPerLap = 100 / 28;
+  const tours = Math.round(val / fuelPerLap);
+  document.getElementById('fuel-slider-info').textContent = `~${tours} tours d'autonomie supplémentaires`;
+}
+
+function setFuelPlan(l) {
+  G.plannedFuel = parseInt(l);
+  const slider = document.getElementById('fuel-slider');
+  if(slider) { slider.value = l; updateFuelSlider(l); }
+}
+
+function selectAggro(btn) {
+  document.querySelectorAll('[data-aggro]').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  G.driverAggro = btn.dataset.aggro;
+  const labels = { soft:'🟢 Mode Doux — pneus préservés', normal:'⚪ Mode Normal', push:'🔴 Mode Push — attention aux pneus !' };
+  radioMsg(labels[G.driverAggro], 'info');
+}
+
+function activateBoost() {
+  if(G.boostActive) return;
+  if(G.battery < 20) {
+    radioMsg('⚡ Batterie insuffisante pour le boost !', 'alert');
+    return;
+  }
+  G.boostActive = true;
+  G.boostTimeLeft = 3000; // 3 secondes réelles
+  G.battery = Math.max(0, G.battery - 20);
+  radioMsg('⚡ BOOST activé !', 'good');
+  notify('⚡ Boost hybride activé !', 'good');
+  document.getElementById('boost-btn').style.background = 'var(--cyan)';
+  document.getElementById('boost-btn').style.color = '#000';
+  document.getElementById('boost-status').textContent = 'BOOST ACTIF ⚡';
+}
+
+function selectEngineMode(btn) {
+  document.querySelectorAll('[data-mode]').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+  G.engineMode = btn.dataset.mode;
+  radioMsg(`Mode moteur → ${btn.textContent}`, 'info');
+}
+
+function buildDriverBtns() {
+  const el = document.getElementById('driver-btns');
+  G.drivers.forEach((d,i) => {
+    const btn = document.createElement('button');
+    btn.className = 'btn' + (i===G.currentDriverIdx?' selected':'');
+    btn.textContent = d.name.split(' ')[0];
+    btn.onclick = () => {
+      G.plannedDriverChange = true;
+      G.drivers.forEach((_,j) => {
+        const b = el.children[j];
+        b.classList.toggle('selected', j !== G.currentDriverIdx);
+      });
+    };
+    el.appendChild(btn);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TELEMETRY
+// ═══════════════════════════════════════════════════════════
+function updateTelemetry() {
+  const fuelPct = (G.fuel / G.fuelCap * 100);
+  const tyrePct = G.tyreWear;
+  const staminaPct = G.driverStamina[G.currentDriverIdx];
+  const engPct = G.engineHealth;
+
+  const fuelEl = document.getElementById('t-fuel');
+  fuelEl.textContent = `${Math.round(G.fuel)}L`;
+  fuelEl.className = 'telem-val ' + (fuelPct>40?'ok':fuelPct>15?'mid':'warn');
+  setBar('t-fuel-bar', fuelPct, fuelPct>40?'var(--green)':fuelPct>15?'var(--accent)':'var(--red)');
+
+  const tEl = document.getElementById('t-tyres');
+  tEl.textContent = `${Math.round(tyrePct)}%`;
+  tEl.className = 'telem-val ' + (tyrePct>50?'ok':tyrePct>25?'mid':'warn');
+  setBar('t-tyre-bar', tyrePct, tyrePct>50?'var(--green)':tyrePct>25?'var(--accent)':'var(--red)');
+
+  const sEl = document.getElementById('t-driver-stamina');
+  sEl.textContent = `${Math.round(staminaPct)}%`;
+  sEl.className = 'telem-val ' + (staminaPct>60?'ok':staminaPct>30?'mid':'warn');
+  setBar('t-stamina-bar', staminaPct, staminaPct>60?'var(--green)':staminaPct>30?'var(--accent)':'var(--red)');
+
+  const eEl = document.getElementById('t-engine');
+  eEl.textContent = engPct>80?'OK':engPct>50?'⚠️':'🔴';
+  eEl.className = 'telem-val ' + (engPct>80?'ok':engPct>50?'mid':'warn');
+  setBar('t-engine-bar', engPct, engPct>80?'var(--green)':engPct>50?'var(--accent)':'var(--red)');
+
+  // Batterie
+  const batPct = G.battery;
+  const batEl = document.getElementById('t-battery');
+  if(batEl) {
+    batEl.textContent = `${Math.round(batPct)}%`;
+    batEl.className = 'telem-val ' + (batPct>40?'ok':batPct>20?'mid':'warn');
+    batEl.style.color = G.boostActive ? '#fff' : 'var(--cyan)';
+    setBar('t-battery-bar', batPct, G.boostActive ? '#fff' : 'var(--cyan)');
+  }
+  // Jauge batterie panneau stratégie
+  const batBar = document.getElementById('battery-bar');
+  const batVal = document.getElementById('battery-val');
+  if(batBar) {
+    batBar.style.width = batPct + '%';
+    batBar.style.background = G.boostActive ? '#fff' : batPct > 40 ? 'var(--cyan)' : batPct > 20 ? 'var(--accent)' : 'var(--red)';
+  }
+  if(batVal) batVal.textContent = Math.round(batPct) + '%';
+}
+
+function setBar(id, pct, color) {
+  const el = document.getElementById(id);
+  el.style.width = Math.max(0,Math.min(100,pct)) + '%';
+  el.style.background = color;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  STANDINGS
+// ═══════════════════════════════════════════════════════════
+// distTotal est la distance cumulée depuis le départ (jamais réinitialisée).
+// C'est la seule source de vérité pour le classement.
+function buildStandingsList() {
+  const player = {
+    teamName: G.teamName, carName: G.car.name,
+    lap: G.lap, dist: G.distTotal,
+    tyre: G.tyreType, battery: G.battery,
+    isPlayer: true, retired: false
+  };
+  const comps = G.competitors.map(c => ({
+    teamName: c.teamName, carName: c.name,
+    lap: c.lap, dist: c.distTotal,
+    tyre: c.tyreType, battery: c.battery || 50,
+    isPlayer: false, retired: c.retired
+  }));
+
+  // Ajouter les joueurs humains multijoueur
+  const humans = (MULTI.humanStandings || []);
+
+  const all = [player, ...comps, ...humans].filter(c => !c.retired);
+  all.sort((a, b) => b.dist - a.dist);
+  return all;
+}
+
+function getPlayerPos() {
+  const all = buildStandingsList();
+  return all.findIndex(a => a.isPlayer) + 1;
+}
+
+function updateStandings() {
+  const el = document.getElementById('standings-body');
+  const all = buildStandingsList();
+  const leader = all[0];
+
+  el.innerHTML = all.map((c, i) => {
+    const distGap = leader.dist - c.dist; // en fractions de tour
+    const gapSec = distGap * G.car.lapBase;
+    let gapStr;
+    if (i === 0) {
+      gapStr = 'LEADER';
+    } else if (distGap >= 1) {
+      const tours = Math.floor(distGap);
+      gapStr = `+${tours} tour${tours > 1 ? 's' : ''}`;
+    } else {
+      gapStr = `+${gapSec.toFixed(1)}s`;
+    }
+    return `
+      <div class="standing-row ${c.isPlayer ? 'player' : ''}">
+        <div class="pos-num ${i === 0 ? 'p1' : ''}">${i + 1}</div>
+        <div>
+          <div class="car-name" style="${c.isPlayer ? 'color:var(--accent)' : c.teamName.startsWith('[IA]') ? 'color:var(--text2)' : ''}">${c.teamName}</div>
+          <div class="car-sub">${c.carName}</div>
+        </div>
+        <div class="gap-val ${i === 0 ? 'leader' : ''}">${gapStr}</div>
+        <div class="lap-val">T${c.lap}</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <span class="tyre-badge"><span class="tyre-dot tyre-${c.tyre}"></span></span>
+          ${c.battery !== undefined ? `<span style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--cyan)">⚡${Math.round(c.battery)}%</span>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  MÉTÉO ÉVOLUTIVE — système de fronts avec annonces
+// ═══════════════════════════════════════════════════════════
+
+// Un "front météo" se prépare en coulisses, s'annonce en 3 étapes,
+// puis arrive (ou se dissipe si la probabilité ne se confirme pas).
+// Ça crée de l'anticipation sans être scriptable.
+
+function weatherTick(dt) {
+  // Avancer le compteur du front météo en cours
+  G.weatherFrontIn -= dt * 9 / (60 * 1000); // en tours fictifs
+
+  // Annonces progressives selon la distance au changement
+  if(!G.weatherAnnounced3 && G.weatherFrontIn <= 10 && G.weatherFrontTarget !== G.weather) {
+    G.weatherAnnounced3 = true;
+    const prob = Math.round(G.weatherFrontProb * 100);
+    const target = G.weatherFrontTarget;
+    const msg = target === 'dry'
+      ? `☀️ Amélioration possible dans ~10 tours (${prob}%)`
+      : target === 'light_rain'
+      ? `🌦 Pluie légère possible dans ~10 tours (${prob}%)`
+      : `⛈ Forte pluie possible dans ~10 tours (${prob}%)`;
+    radioMsg(msg, 'info');
+    notify(msg, 'info');
+  }
+  if(!G.weatherAnnounced2 && G.weatherFrontIn <= 5 && G.weatherFrontTarget !== G.weather) {
+    G.weatherAnnounced2 = true;
+    const prob = Math.round(Math.min(95, G.weatherFrontProb * 120) * 100) / 100;
+    const target = G.weatherFrontTarget;
+    const msg = target === 'dry'
+      ? `☀️ Piste qui sèche dans ~5 tours — pensez aux slicks !`
+      : target === 'light_rain'
+      ? `🌦 Pluie légère imminente — préparez les intermédiaires`
+      : `⛈ Forte pluie dans ~5 tours — montez les pluies !`;
+    radioMsg(msg, 'alert');
+    notify(msg, 'alert');
+  }
+  if(!G.weatherAnnounced1 && G.weatherFrontIn <= 2 && G.weatherFrontTarget !== G.weather) {
+    G.weatherAnnounced1 = true;
+    const target = G.weatherFrontTarget;
+    const msg = target === 'dry'
+      ? `☀️ Premières éclaircies — piste commence à sécher`
+      : `🌧 Premières gouttes — piste mouillée dans 2 tours !`;
+    radioMsg(msg, 'alert');
+    notify(msg, 'alert');
+  }
+
+  // Arrivée du front météo
+  if(G.weatherFrontIn <= 0) {
+    const prev = G.weather;
+
+    // La probabilité détermine si le changement se produit vraiment
+    if(Math.random() < G.weatherFrontProb) {
+      G.weather = G.weatherFrontTarget;
+      if(G.weather !== prev) {
+        const msg = G.weather === 'dry'
+          ? '☀️ Piste sèche ! Fenêtre pour les slicks.'
+          : G.weather === 'light_rain'
+          ? '🌦 Pluie légère — intermédiaires recommandés.'
+          : '🌧 Forte pluie ! Slicks dangereux.';
+        radioMsg(msg, 'alert');
+        notify(msg, 'alert');
+      }
+    } else if(G.weatherFrontTarget !== G.weather) {
+      // Le front se dissipe sans changer — effet de surprise
+      radioMsg('☀️ Le front météo s\'est dissipé — conditions stables.', 'info');
+    }
+
+    // Planifier le prochain front
+    scheduleNextWeatherFront();
+  }
+}
+
+function scheduleNextWeatherFront() {
+  // Prochain changement dans 8-25 tours fictifs
+  G.weatherFrontIn = 8 + Math.random() * 17;
+  // Reset annonces
+  G.weatherAnnounced3 = false;
+  G.weatherAnnounced2 = false;
+  G.weatherAnnounced1 = false;
+
+  // Déterminer la cible et la probabilité
+  if(G.weather === 'dry') {
+    const r = Math.random();
+    if(r < 0.5) {
+      G.weatherFrontTarget = 'dry'; // rien ne change
+      G.weatherFrontProb = 0;
+    } else if(r < 0.75) {
+      G.weatherFrontTarget = 'light_rain';
+      G.weatherFrontProb = 0.3 + Math.random() * 0.5; // 30-80%
+    } else {
+      G.weatherFrontTarget = 'rain';
+      G.weatherFrontProb = 0.2 + Math.random() * 0.4; // 20-60%
+    }
+  } else {
+    // Retour au sec toujours possible
+    G.weatherFrontTarget = 'dry';
+    G.weatherFrontProb = 0.4 + Math.random() * 0.4; // 40-80%
+  }
+  // Température évolue légèrement
+  G.weatherTemp = Math.max(10, Math.min(38, G.weatherTemp + (Math.random()-0.5)*4));
+}
+
+function updateWeatherUI() {
+  const icons = { dry:'☀️', light_rain:'🌦', rain:'🌧' };
+  const descs = {
+    dry:        `Sec · ${Math.round(G.weatherTemp)}°C`,
+    light_rain: `Pluie légère · ${Math.round(G.weatherTemp-3)}°C`,
+    rain:       `Pluie forte · ${Math.round(G.weatherTemp-8)}°C`
+  };
+
+  document.getElementById('weather-icon').textContent = icons[G.weather] || '☀️';
+  document.getElementById('weather-desc').textContent = descs[G.weather] || 'Sec';
+  document.getElementById('h-weather').textContent = icons[G.weather] || '☀️';
+
+  // Prévision basée sur le front météo en cours
+  let forecast = 'Stable — aucun changement prévu';
+  if(G.weatherFrontTarget && G.weatherFrontTarget !== G.weather && G.weatherFrontProb > 0) {
+    const toursLeft = Math.ceil(G.weatherFrontIn);
+    const prob = Math.round(G.weatherFrontProb * 100);
+    const targetIcon = icons[G.weatherFrontTarget] || '☀️';
+    if(toursLeft <= 2) {
+      forecast = `⚠️ ${targetIcon} Changement imminent !`;
+    } else if(toursLeft <= 5) {
+      forecast = `${targetIcon} Dans ~${toursLeft} tours · ${prob}% de prob.`;
+    } else if(toursLeft <= 10) {
+      forecast = `${targetIcon} Dans ~${toursLeft} tours · ${prob}% de prob.`;
+    } else {
+      forecast = `${targetIcon} Possible dans ~${toursLeft} tours`;
+    }
+  }
+  document.getElementById('weather-forecast').textContent = forecast;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  DRIVER DISPLAY
+// ═══════════════════════════════════════════════════════════
+function buildDriverUI() {
+  const el = document.getElementById('driver-display');
+  el.innerHTML = G.drivers.map((d,i)=>`
+    <div class="driver-row">
+      <div class="driver-num">${i+1}</div>
+      <div class="driver-info">
+        <div class="driver-name">${d.name}</div>
+        <div class="driver-stat" id="drv-stat-${i}">Stamina : 100%</div>
+      </div>
+      <div class="driver-bars">
+        <div class="mini-bar"><div class="mini-bar-fill" style="width:${d.pace}%" title="Rythme"></div></div>
+        <div class="mini-bar"><div class="mini-bar-fill stamina-fill" id="stamina-bar-${i}" style="width:100%"></div></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function updateDriverStaminaUI() {
+  const bar = document.getElementById('stamina-bar-0');
+  const stat = document.getElementById('drv-stat-0');
+  if(bar) bar.style.width = G.driverStamina[0] + '%';
+  if(stat) stat.textContent = `Stamina : ${Math.round(G.driverStamina[0])}%`;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CLOCK
+// ═══════════════════════════════════════════════════════════
+function updateClock() {
+  const m = Math.floor(G.raceTimeMs/60000);
+  const s = Math.floor((G.raceTimeMs%60000)/1000);
+  document.getElementById('race-clock').textContent =
+    String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+
+function formatLap(ms) {
+  if(!ms) return '—';
+  const m = Math.floor(ms/60000);
+  const s = Math.floor((ms%60000)/1000);
+  const t = Math.floor((ms%1000)/10);
+  return `${m}:${String(s).padStart(2,'0')}.${String(t).padStart(2,'0')}`;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RADIO
+// ═══════════════════════════════════════════════════════════
+let lastRadioTime = -99;
+function radioMsg(msg, type='info') {
+  if(G.lap === lastRadioTime && type==='info') return;
+  lastRadioTime = G.lap;
+  const log = document.getElementById('radio-log');
+  const el = document.createElement('div');
+  const m = Math.floor(G.raceTimeMs/60000);
+  const s = Math.floor((G.raceTimeMs%60000)/1000);
+  el.className = `radio-msg ${type}`;
+  el.innerHTML = `<span class="radio-time">${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}</span>${msg}`;
+  log.insertBefore(el, log.firstChild);
+  while(log.children.length > 12) log.removeChild(log.lastChild);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════
+function notify(msg, type='info') {
+  const area = document.getElementById('notif-area');
+  const el = document.createElement('div');
+  el.className = `notif ${type}`;
+  el.textContent = msg;
+  area.appendChild(el);
+  setTimeout(()=>el.remove(), 4000);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PAUSE
+// ═══════════════════════════════════════════════════════════
+function togglePause() {
+  G.paused = !G.paused;
+  if(!G.paused) lastTs = performance.now();
+  radioMsg(G.paused ? '⏸ Course en pause' : '▶ Course reprise', 'info');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  END RACE
+// ═══════════════════════════════════════════════════════════
+function endRace() {
+  G.finished = true;
+  const pos = getPlayerPos();
+  const suf = pos===1?'er':'ème';
+
+  document.getElementById('end-pos').textContent = pos + suf;
+  document.getElementById('end-team').innerHTML = `
+    <div style="font-size:18px;color:var(--accent);font-weight:600">${G.teamName}</div>
+    <div style="font-size:12px;color:var(--text3);margin-top:2px">${G.car.name} · ${G.drivers[0].name}</div>
+  `;
+
+  const totalMin = Math.floor(G.raceTimeMs/60000);
+  const totalSec = Math.floor((G.raceTimeMs%60000)/1000);
+
+  // Classement final
+  const finalStandings = buildStandingsList();
+
+  document.getElementById('end-stats').innerHTML = `
+    <div class="end-stat">
+      <div class="end-stat-label">Tours</div>
+      <div class="end-stat-val">${G.lap}</div>
+    </div>
+    <div class="end-stat">
+      <div class="end-stat-label">Arrêts</div>
+      <div class="end-stat-val">${G.pitStopCount}</div>
+    </div>
+    <div class="end-stat">
+      <div class="end-stat-label">Meilleur tour</div>
+      <div class="end-stat-val">${formatLap(G.bestLapMs)}</div>
+    </div>
+    <div class="end-stat">
+      <div class="end-stat-label">Temps de course</div>
+      <div class="end-stat-val">${totalMin}:${String(totalSec).padStart(2,'0')}</div>
+    </div>
+    <div class="end-stat">
+      <div class="end-stat-label">Temps aux stands</div>
+      <div class="end-stat-val">${Math.round(G.totalPitTime)}s</div>
+    </div>
+    <div class="end-stat">
+      <div class="end-stat-label">Pilote</div>
+      <div class="end-stat-val">${G.drivers[0].name.split(' ')[0]}</div>
+    </div>
+  `;
+
+  // Classement final complet
+  const standingsHtml = `
+    <div style="margin-top:20px;text-align:left">
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Classement final</div>
+      ${finalStandings.map((c, i) => `
+        <div style="display:grid;grid-template-columns:28px 1fr 60px;align-items:center;gap:6px;
+          padding:5px 10px;margin-bottom:2px;border-radius:3px;font-size:12px;
+          background:${c.isPlayer?'rgba(232,160,32,0.08)':'rgba(255,255,255,0.02)'};
+          border:1px solid ${c.isPlayer?'var(--accent)':'var(--border)'}">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;
+            color:${i===0?'gold':i===1?'silver':i===2?'#cd7f32':'var(--text3)'};text-align:center">${i+1}</div>
+          <div>
+            <div style="${c.isPlayer?'color:var(--accent);font-weight:600':'color:var(--text2)'}">${c.teamName}</div>
+            <div style="font-size:10px;color:var(--text3)">${c.carName}</div>
+          </div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text3);text-align:right">
+            ${i===0?'LEADER':`+${((c.dist - finalStandings[0].dist) * -1 * G.car.lapBase).toFixed(1)}s`}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  document.getElementById('end-screen').querySelector('.end-box').insertAdjacentHTML('beforeend', standingsHtml);
+  document.getElementById('end-screen').classList.add('open');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════
+window.addEventListener('resize', ()=>{ if(ctx) initCanvas(); });
+// buildSetupScreen est appelé par selectMode après le choix du mode
+</script>
+</body>
+</html>
