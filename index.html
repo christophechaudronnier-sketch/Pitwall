@@ -1780,12 +1780,16 @@ function applyRaceStateFromServer(state) {
       comp.retired = entry.retired || false;
     });
 
-    // Position du joueur depuis le serveur
+    // Position du joueur — le serveur est la vérité
     const myEntry = state.standings.find(e => e.playerId === MULTI.playerId);
     if(myEntry) {
       G.trackPos = myEntry.trackPos;
       G.distTotal = myEntry.distTotal;
       G.lap = myEntry.lap;
+      G.tyreType = myEntry.tyreType;
+      G.battery = myEntry.battery;
+      G.pitState = myEntry.pitState || 'racing';
+      G.pitLanePos = myEntry.pitLanePos || 0;
     }
   }
 
@@ -3743,17 +3747,16 @@ function gameLoop(ts) {
   if(!G.paused) {
     G.raceTimeMs += dt * 9;
 
-    // Ma voiture — toujours calculée localement pour le ressenti immédiat
-    advancePlayerCar(dt, G);
-    tickBoost(dt);
-
     if(!MULTI.eventId) {
-      // ══ MODE SOLO : simule les IA et la météo ══
+      // ══ MODE SOLO : tout se calcule localement ══
+      advancePlayerCar(dt, G);
+      tickBoost(dt);
       advanceAICars(dt);
       weatherTick(dt);
     } else {
       // ══ MODE MULTI : Cloud Function gère tout ══
-      // On publie juste nos décisions toutes les 300ms
+      // Le client publie ses décisions, le serveur est la vérité
+      tickBoost(dt); // uniquement pour l'animation boost
       publishPlayerDecisions();
     }
 
